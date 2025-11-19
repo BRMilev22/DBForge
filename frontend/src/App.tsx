@@ -29,8 +29,6 @@ function App() {
   const [activeTab, setActiveTab] = useState<'overview' | 'databases' | 'activity'>('overview');
   const [toasts, setToasts] = useState<Array<{ id: number; message: string; type: 'success' | 'error' }>>([]);
   const [showAuthModal, setShowAuthModal] = useState(false);
-  const [apiTokenInput, setApiTokenInput] = useState<string>("");
-  const [isTokenVisible, setIsTokenVisible] = useState<boolean>(false);
   const [selectedDatabase, setSelectedDatabase] = useState<DatabaseInstance | null>(null);
   const [workbenchDatabase, setWorkbenchDatabase] = useState<DatabaseInstance | null>(null);
 
@@ -42,29 +40,7 @@ function App() {
     }, 5000);
   };
 
-  // Initialize API token from localStorage
-  useEffect(() => {
-    const t = localStorage.getItem('auth_token') || '';
-    setApiTokenInput(t);
-  }, []);
-
-  const saveApiToken = (token: string) => {
-    if (!token) {
-      localStorage.removeItem('auth_token');
-      setApiTokenInput('');
-      showToast('API token cleared', 'success');
-      return;
-    }
-    localStorage.setItem('auth_token', token);
-    setApiTokenInput(token);
-    showToast('API token saved', 'success');
-  };
-
-  const clearApiToken = () => {
-    localStorage.removeItem('auth_token');
-    setApiTokenInput('');
-    showToast('API token removed', 'success');
-  };
+  
 
   const loadDatabases = async () => {
     if (!user) return;
@@ -447,38 +423,7 @@ function App() {
                     </div>
                   </button>
 
-                  {/* API Token Quick Input */}
-                  <div className="mt-3">
-                    <label className="text-[11px] text-zinc-400 font-medium">API Token (paste here)</label>
-                    <div className="flex gap-2 mt-2">
-                      <input
-                        type={isTokenVisible ? 'text' : 'password'}
-                        value={apiTokenInput}
-                        onChange={(e) => setApiTokenInput(e.target.value)}
-                        placeholder="dfg_live_..."
-                        className="flex-1 px-3 py-2 rounded-lg bg-zinc-950/50 border border-zinc-800 text-sm text-zinc-200 placeholder:text-zinc-500"
-                      />
-                      <button
-                        onClick={() => saveApiToken(apiTokenInput)}
-                        className="px-3 py-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 text-xs font-medium hover:bg-emerald-500/15 transition"
-                      >
-                        Save
-                      </button>
-                      <button
-                        onClick={clearApiToken}
-                        className="px-3 py-2 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs font-medium hover:bg-rose-500/20 transition"
-                      >
-                        Clear
-                      </button>
-                      <button
-                        onClick={() => setIsTokenVisible(v => !v)}
-                        className="px-2 py-2 rounded-lg border border-zinc-800 bg-zinc-900/50 text-xs text-zinc-300 hover:bg-zinc-800/50 transition"
-                        title={isTokenVisible ? 'Hide token' : 'Show token'}
-                      >
-                        {isTokenVisible ? 'Hide' : 'Show'}
-                      </button>
-                    </div>
-                  </div>
+                  
 
                   <button className="w-full p-3 rounded-lg border border-zinc-800 bg-zinc-900/50 hover:bg-zinc-800/50 hover:border-zinc-700 transition-all text-left group">
                     <div className="flex items-center gap-3">
