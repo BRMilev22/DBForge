@@ -1,0 +1,139 @@
+package com.dbforge.dbforge.controller;
+
+import com.dbforge.dbforge.dto.CreateDatabaseRequest;
+import com.dbforge.dbforge.dto.DatabaseResponse;
+import com.dbforge.dbforge.model.DatabaseInstance;
+import com.dbforge.dbforge.model.DatabaseType;
+import com.dbforge.dbforge.service.DatabaseService;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+
+@RestController
+@RequestMapping("/api/databases")
+@RequiredArgsConstructor
+@Slf4j
+@CrossOrigin(origins = "*")
+public class DatabaseController {
+    
+    private final DatabaseService databaseService;
+    
+    private Long getUserId(Authentication authentication) {
+        if (authentication == null || authentication.getPrincipal() == null) {
+            throw new RuntimeException("User not authenticated");
+        }
+        return (Long) authentication.getPrincipal();
+    }
+    
+    @GetMapping("/types")
+    public ResponseEntity<List<DatabaseType>> getAvailableTypes() {
+        return ResponseEntity.ok(databaseService.getAvailableDatabaseTypes());
+    }
+    
+    @PostMapping
+    public ResponseEntity<?> createDatabase(
+            @RequestBody CreateDatabaseRequest request,
+            Authentication authentication) {
+        
+        try {
+            Long userId = getUserId(authentication);
+            log.info("Creating database: {} for user: {}", request.getInstanceName(), userId);
+            
+            DatabaseInstance instance = databaseService.createDatabase(
+                    userId,
+                    request.getDatabaseType(),
+                    request.getInstanceName(),
+                    request.getDbUsername(),
+                    request.getDbPassword()
+            );
+            
+            return ResponseEntity.ok(DatabaseResponse.from(instance));
+        } catch (Exception e) {
+            log.error("Failed to create database", e);
+            return ResponseEntity.status(500).body(Map.of("error", e.getMessage()));
+        }
+    }
+    
+    @GetMapping
+    public ResponseEntity<List<DatabaseResponse>> getUserDatabases(Authentication authentication) {
+        
+        try {
+            Long userId = getUserId(authentication);
+            List<DatabaseResponse> databases = databaseService.getUserDatabases(userId)
+                    .stream()
+                    .map(DatabaseResponse::from)
+                    .collect(Collectors.toList());
+            
+            return ResponseEntity.ok(databases);
+        } catch (Exception e) {
+            log.error("Failed to get databases", e);
+            return ResponseEntity.status(401).body(List.of());
+        }
+    }
+    
+    @GetMapping("/{id}")
+    public ResponseEntity<DatabaseResponse> getDatabase(
+            @PathVariable Long id,
+            Authentication authentication) {
+        
+        try {
+            Long userId = getUserId(authentication);
+            DatabaseInstance instance = databaseService.getDatabaseById(id);
+            return ResponseEntity.ok(DatabaseResponse.from(instance));
+        } catch (Exception e) {
+            log.error("Failed to get database", e);
+            return ResponseEntity.status(404).body(null);
+        }
+    }
+    
+    @PostMapping("/{id}/start")
+    public ResponseEntity<String> startDatabase(
+            @PathVariable Long id,
+            Authentication authentication) {
+        
+        try {
+            Long userId = getUserId(authentication);
+            databaseService.startDatabase(id, userId);
+            return ResponseEntity.ok("Database started");
+        } catch (Exception e) {
+            log.error("Failed to start database", e);
+            return ResponseEntity.status(500).body("Failed to start database");
+        }
+    }
+    
+    @PostMapping("/{id}/stop")
+    public ResponseEntity<String> stopDatabase(
+            @PathVariable Long id,
+            Authentication authentication) {
+        
+        try {
+            Long userId = getUserId(authentication);
+            databaseService.stopDatabase(id, userId);
+            return ResponseEntity.ok("Database stopped");
+        } catch (Exception e) {
+            log.error("Failed to stop database", e);
+            return ResponseEntity.status(500).body("Failed to stop database");
+        }
+    }
+    
+    @DeleteMapping("/{id}")
+    public ResponseEntity<String> deleteDatabase(
+            @PathVariable Long id,
+            Authentication authentication) {
+        
+        try {
+            Long userId = getUserId(authentication);
+            databaseService.deleteDatabase(id, userId);
+            return ResponseEntity.ok("Database deleted");
+        } catch (Exception e) {
+            log.error("Failed to delete database", e);
+            return ResponseEntity.status(500).body("Failed to delete database");
+        }
+    }
+}

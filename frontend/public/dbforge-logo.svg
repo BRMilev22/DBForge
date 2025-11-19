@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" fill="none">
+  <!-- Anvil base -->
+  <path d="M40 140 L160 140 L150 160 L50 160 Z" fill="#3f3f46"/>
+  
+  <!-- Anvil body -->
+  <path d="M50 80 L150 80 L160 140 L40 140 Z" fill="#52525b"/>
+  
+  <!-- Anvil horn -->
+  <path d="M150 80 L170 100 L160 140 L150 140 Z" fill="#71717a"/>
+  
+  <!-- Database cylinder 1 -->
+  <ellipse cx="70" cy="50" rx="25" ry="8" fill="#7c3aed"/>
+  <rect x="45" y="50" width="50" height="20" fill="#7c3aed"/>
+  <ellipse cx="70" cy="70" rx="25" ry="8" fill="#6d28d9"/>
+  
+  <!-- Database rings -->
+  <ellipse cx="70" cy="55" rx="25" ry="3" fill="#ffffff" opacity="0.3"/>
+  <ellipse cx="70" cy="62" rx="25" ry="3" fill="#ffffff" opacity="0.3"/>
+  
+  <!-- Spark/forge effect -->
+  <circle cx="130" cy="100" r="3" fill="#fbbf24" opacity="0.8"/>
+  <circle cx="135" cy="95" r="2" fill="#f59e0b" opacity="0.6"/>
+  <circle cx="125" cy="105" r="2" fill="#f59e0b" opacity="0.6"/>
+</svg>

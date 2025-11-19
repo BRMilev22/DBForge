@@ -1,0 +1,47 @@
+# General
+.DS_Store
+*.log
+*.tmp
+.env
+.env.local
+
+# Backend (Java/Maven)
+backend/target/
+backend/.mvn/
+backend/mvnw
+backend/mvnw.cmd
+backend/.idea/
+backend/*.iml
+backend/*.iws
+backend/*.ipr
+
+# Frontend (Node/React)
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+frontend/.env.local
+frontend/.env.production
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Logs
+logs/
+*.log
+
+# Passwords and secrets
+*password*.txt
+*secret*.txt
+vps-*.txt
+
+# Compiled files
+*.class
+*.jar
+!backend/.mvn/wrapper/maven-wrapper.jar
+
+# OS
+Thumbs.db

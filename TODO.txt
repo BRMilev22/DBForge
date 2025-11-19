@@ -1,0 +1,186 @@
+DBForge - TODO & Known Issues
+================================
+
+## Critical Issues
+- [ ] Fix SQL syntax showing in Redis query editor (should show Redis command examples)
+- [ ] Fix SQL syntax showing in MongoDB query editor (should show MongoDB query examples)
+- [ ] External database access: Port 6379 not accessible from outside despite firewall rule (6379:6478 range vs exact 6379)
+- [ ] MongoDB port may have same external access issue as Redis
+- [ ] PostgreSQL external access needs testing
+
+## NoSQL Query Interface Improvements
+- [ ] Add Redis command palette/autocomplete (GET, SET, KEYS, HGET, etc.)
+- [ ] Add MongoDB query builder UI for common operations (find, insert, update, delete)
+- [ ] Create Redis key browser component (replace table view with key-value list)
+- [ ] Create MongoDB collection document viewer with JSON editor
+- [ ] Add Redis data type indicators (string, list, set, hash, zset)
+- [ ] Implement Redis key search/filter functionality
+- [ ] Add MongoDB query validation and syntax highlighting for JavaScript
+
+## Schema Browser Enhancements
+- [ ] MongoDB: Display document count per collection
+- [ ] MongoDB: Show sample document structure for each collection
+- [ ] MongoDB: Add indexes view for collections
+- [ ] Redis: Create custom key browser UI (current table view doesn't fit key-value paradigm)
+- [ ] Redis: Add key pattern grouping (e.g., user:*, session:*)
+- [ ] Redis: Display key TTL in browser
+
+## Query Editor Features
+- [ ] Add query templates for each database type
+- [ ] Implement query validation before execution
+- [ ] Add keyboard shortcuts documentation panel
+- [ ] Save query drafts per database instance
+- [ ] Add query execution time tracking and performance insights
+- [ ] Implement multi-query execution (batch queries)
+
+## Database Management
+- [ ] Add database backup functionality (mysqldump, mongodump, redis SAVE)
+- [ ] Add database restore from backup
+- [ ] Implement database cloning feature
+- [ ] Add resource usage monitoring per container (CPU, memory, disk)
+- [ ] Display real-time connection count
+- [ ] Add database size statistics
+- [ ] Implement automatic container restart on crash
+
+## Security & Access Control
+- [ ] Implement user roles (admin, developer, viewer)
+- [ ] Add database-level access permissions
+- [ ] Implement IP whitelisting for database connections
+- [ ] Add SSL/TLS support for database connections
+- [ ] Generate secure random passwords by default
+- [ ] Add password complexity requirements
+- [ ] Implement API key authentication for external tools
+
+## Export/Import Improvements
+- [ ] Add MongoDB export (JSON, BSON)
+- [ ] Add Redis export (RDB, AOF)
+- [ ] Implement scheduled backups
+- [ ] Add export to cloud storage (S3, GCS)
+- [ ] Support compressed exports (gzip, zip)
+- [ ] Add import validation and preview
+
+## UI/UX Enhancements
+- [ ] Add dark/light theme toggle
+- [ ] Improve mobile responsiveness
+- [ ] Add loading skeletons for better perceived performance
+- [ ] Implement keyboard navigation throughout app
+- [ ] Add contextual help tooltips
+- [ ] Create onboarding tour for new users
+- [ ] Add database connection status indicators on dashboard
+- [ ] Implement drag-and-drop for query tabs
+- [ ] Add split-view for query editor and results
+
+## Query History & Bookmarks
+- [ ] Add query history search/filter
+- [ ] Implement query sharing between team members
+- [ ] Add query execution statistics (avg time, success rate)
+- [ ] Export query history to file
+- [ ] Add tags/categories for bookmarked queries
+- [ ] Implement query versioning
+
+## Table/Collection Operations
+- [ ] Add bulk row operations (bulk delete, bulk update)
+- [ ] Implement data validation on inline editing
+- [ ] Add column sorting in table content view
+- [ ] Add column filtering in table content view
+- [ ] Implement virtual scrolling for large datasets
+- [ ] Add Excel-like formula support for computed columns
+
+## Connection Management
+- [ ] Add connection pooling configuration
+- [ ] Display active connections per database
+- [ ] Implement connection timeout settings
+- [ ] Add read replica support
+- [ ] Support connection via SSH tunnel
+- [ ] Add connection testing before database creation
+
+## Monitoring & Logging
+- [ ] Add query execution logs
+- [ ] Implement slow query detection and alerts
+- [ ] Add database error logs viewer
+- [ ] Create performance dashboard with charts
+- [ ] Add email/Slack notifications for errors
+- [ ] Implement audit logging for all operations
+
+## Data Visualization
+- [ ] Add chart builder for query results
+- [ ] Implement ER diagram generator for SQL databases
+- [ ] Add relationship visualization
+- [ ] Create data statistics dashboard
+- [ ] Add query result comparison tool
+
+## Developer Tools
+- [ ] Add SQL formatter with customizable style
+- [ ] Implement JSON formatter for MongoDB
+- [ ] Add schema diff tool (compare two databases)
+- [ ] Create data migration wizard
+- [ ] Add SQL to MongoDB query converter
+- [ ] Implement query explain/analyze visualization
+
+## Performance & Optimization
+- [ ] Implement query result caching
+- [ ] Add query result pagination on backend
+- [ ] Optimize schema introspection for large databases
+- [ ] Add connection pooling for query execution
+- [ ] Implement lazy loading for schema tree
+- [ ] Add database indexing suggestions
+
+## Documentation & Help
+- [ ] Create comprehensive user documentation
+- [ ] Add API documentation for developers
+- [ ] Create video tutorials
+- [ ] Add in-app command reference for Redis/MongoDB
+- [ ] Create troubleshooting guide
+- [ ] Add database best practices guide
+
+## Testing & Quality
+- [ ] Add unit tests for backend services
+- [ ] Add integration tests for database operations
+- [ ] Add E2E tests for critical user flows
+- [ ] Implement CI/CD pipeline
+- [ ] Add code coverage reporting
+- [ ] Implement automated security scanning
+
+## DevOps & Deployment
+- [ ] Create Docker Compose setup for easy deployment
+- [ ] Add Kubernetes manifests
+- [ ] Implement zero-downtime updates
+- [ ] Add health check endpoints
+- [ ] Create deployment documentation
+- [ ] Add metrics collection (Prometheus)
+- [ ] Implement distributed tracing
+
+## Future Features
+- [ ] Add support for more databases (CockroachDB, Cassandra, Neo4j)
+- [ ] Implement database branching (like git branches)
+- [ ] Add time-travel queries (view historical data)
+- [ ] Create collaborative query editor (real-time collaboration)
+- [ ] Add AI-powered query suggestions
+- [ ] Implement natural language to SQL/MongoDB conversion
+- [ ] Add data anonymization for compliance
+- [ ] Create database playground for testing queries safely
+
+## Bug Fixes
+- [ ] Fix 403 authentication errors on page refresh
+- [ ] Ensure JWT token persistence across sessions
+- [ ] Fix Monaco editor language detection for NoSQL databases
+- [ ] Resolve source map warnings in browser console
+- [ ] Fix password field security warnings on HTTP
+- [ ] Ensure proper cleanup of Docker containers on deletion
+
+## Code Quality & Refactoring
+- [ ] Extract common query execution logic to base service
+- [ ] Standardize error handling across all services
+- [ ] Add JSDoc comments to frontend components
+- [ ] Add Javadoc comments to backend services
+- [ ] Implement consistent logging patterns
+- [ ] Refactor large components into smaller, reusable ones
+- [ ] Add TypeScript strict mode
+- [ ] Implement proper dependency injection patterns
+
+---
+Priority Levels:
+🔴 Critical - Must fix immediately
+🟡 High - Important for next release
+🟢 Medium - Nice to have soon
+⚪ Low - Future consideration

@@ -1,0 +1,192 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 4%;
+    --foreground: 0 0% 98%;
+    --card: 0 0% 7%;
+    --card-hover: 0 0% 9%;
+    --border: 0 0% 13%;
+  }
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+  background: #0a0a0a;
+  color: #fafafa;
+  font-size: 13px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+html,
+body {
+  background: #0a0a0a;
+  scrollbar-width: thin;
+  scrollbar-color: #8b5cf6 #0a0a0a;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+/* Refined scrollbar with violet accent */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #0a0a0a;
+}
+
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, #8b5cf6, #d946ef);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, #7c3aed, #c026d3);
+}
+
+/* Custom animations */
+@keyframes shimmer {
+  0% {
+    background-position: -1000px 0;
+  }
+  100% {
+    background-position: 1000px 0;
+  }
+}
+
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+@keyframes pulse-glow {
+  0%, 100% {
+    box-shadow: 0 0 8px 2px rgba(139, 92, 246, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 16px 4px rgba(139, 92, 246, 0.5);
+  }
+}
+
+.animate-shimmer {
+  animation: shimmer 2s infinite;
+  background: linear-gradient(
+    to right,
+    transparent 0%,
+    rgba(139, 92, 246, 0.1) 50%,
+    transparent 100%
+  );
+  background-size: 1000px 100%;
+}
+
+.animate-float {
+  animation: float 3s ease-in-out infinite;
+}
+
+/* Smooth transitions for all interactive elements */
+* {
+  transition-property: background-color, border-color, color, fill, stroke, opacity, box-shadow, transform;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 150ms;
+}
+
+/* AG Grid Dark Theme Customization */
+.ag-theme-alpine-dark,
+.ag-theme-quartz-dark {
+  --ag-background-color: #09090b;
+  --ag-header-background-color: #18181b;
+  --ag-odd-row-background-color: #0f0f11;
+  --ag-row-hover-color: rgba(139, 92, 246, 0.15);
+  --ag-selected-row-background-color: rgba(139, 92, 246, 0.2);
+  --ag-border-color: #27272a;
+  --ag-header-foreground-color: #d4d4d8;
+  --ag-foreground-color: #fafafa;
+  --ag-data-color: #fafafa;
+  --ag-secondary-foreground-color: #a1a1aa;
+  --ag-input-border-color: #3f3f46;
+  --ag-input-focus-border-color: #8b5cf6;
+  --ag-font-size: 13px;
+  --ag-font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', sans-serif;
+  background-color: #09090b !important;
+}
+
+.ag-theme-alpine-dark .ag-root-wrapper,
+.ag-theme-quartz-dark .ag-root-wrapper {
+  background-color: #09090b !important;
+}
+
+.ag-theme-alpine-dark .ag-body-viewport,
+.ag-theme-quartz-dark .ag-body-viewport {
+  background-color: #09090b !important;
+}
+
+.ag-theme-alpine-dark .ag-center-cols-viewport,
+.ag-theme-quartz-dark .ag-center-cols-viewport {
+  background-color: #09090b !important;
+}
+
+.ag-theme-alpine-dark .ag-row,
+.ag-theme-quartz-dark .ag-row {
+  background-color: #0a0a0a;
+  color: #fafafa;
+}
+
+.ag-theme-alpine-dark .ag-row-odd,
+.ag-theme-quartz-dark .ag-row-odd {
+  background-color: #0f0f11;
+  color: #fafafa;
+}
+
+.ag-theme-alpine-dark .ag-cell,
+.ag-theme-quartz-dark .ag-cell {
+  color: #fafafa;
+}
+
+.ag-theme-alpine-dark .ag-header-cell-text,
+.ag-theme-quartz-dark .ag-header-cell-text {
+  color: #d4d4d8;
+}
+
+.ag-theme-alpine-dark .ag-paging-panel,
+.ag-theme-quartz-dark .ag-paging-panel {
+  background-color: #09090b;
+  color: #a1a1aa;
+}
+
+.ag-theme-alpine-dark .ag-header,
+.ag-theme-quartz-dark .ag-header {
+  border-bottom: 1px solid #27272a;
+  font-weight: 600;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.025em;
+}
+
+.ag-theme-alpine-dark .ag-cell,
+.ag-theme-quartz-dark .ag-cell {
+  border-color: #27272a;
+}
+
+.ag-theme-alpine-dark .ag-row,
+.ag-theme-quartz-dark .ag-row {
+  border-color: #27272a;
+}
+
+.ag-theme-alpine-dark .ag-paging-panel,
+.ag-theme-quartz-dark .ag-paging-panel {
+  border-top: 1px solid #27272a;
+  background-color: #09090b;
+  padding: 8px 12px;
+}
