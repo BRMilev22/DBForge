@@ -10,11 +10,14 @@ CREATE TABLE IF NOT EXISTS api_tokens (
     is_active BOOLEAN NOT NULL DEFAULT true,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    database_instance_id BIGINT,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (database_instance_id) REFERENCES database_instances(id) ON DELETE SET NULL,
     INDEX idx_user_id (user_id),
     INDEX idx_token_hash (token_hash),
     INDEX idx_is_active (is_active),
-    INDEX idx_expires_at (expires_at)
+    INDEX idx_expires_at (expires_at),
+    INDEX idx_database_instance_id (database_instance_id)
 );
 
 -- Create trigger to update updated_at on record change

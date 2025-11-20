@@ -26,4 +26,6 @@ public class ApiTokenInfo {
     private Boolean isActive;
     
     private LocalDateTime createdAt;
+
+    private Long databaseInstanceId;
 }

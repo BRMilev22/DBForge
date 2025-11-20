@@ -40,4 +40,19 @@ public interface ApiTokenRepository extends JpaRepository<ApiToken, Long> {
      * Find all active tokens across all users
      */
     List<ApiToken> findByIsActiveTrue();
+
+    /**
+     * Find all active tokens for a specific database instance
+     */
+    List<ApiToken> findByDatabaseInstanceIdAndIsActiveTrue(Long databaseInstanceId);
+
+    /**
+     * Find all tokens for a specific database instance
+     */
+    List<ApiToken> findByDatabaseInstanceId(Long databaseInstanceId);
+
+    /**
+     * Find a specific token by user ID, token name, and database instance
+     */
+    Optional<ApiToken> findByUserIdAndTokenNameAndDatabaseInstanceId(Long userId, String tokenName, Long databaseInstanceId);
 }

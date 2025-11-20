@@ -217,6 +217,15 @@ public class DatabaseService {
         return instanceRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Database not found"));
     }
+
+    public DatabaseInstance getDatabaseByApiToken(String apiToken) {
+        if (apiToken == null || apiToken.trim().isEmpty()) {
+            throw new RuntimeException("API token is required");
+        }
+
+        return instanceRepository.findByApiToken(apiToken.trim())
+                .orElseThrow(() -> new RuntimeException("Database not found for the provided API token"));
+    }
     
     @Transactional
     public void deleteDatabase(Long id, Long userId) {

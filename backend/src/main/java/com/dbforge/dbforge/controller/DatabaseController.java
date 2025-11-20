@@ -150,4 +150,15 @@ public class DatabaseController {
             return ResponseEntity.status(500).body(Map.of("error", e.getMessage()));
         }
     }
+
+    @GetMapping("/public/token/{apiToken}")
+    public ResponseEntity<?> getDatabaseByApiToken(@PathVariable String apiToken) {
+        try {
+            DatabaseInstance instance = databaseService.getDatabaseByApiToken(apiToken);
+            return ResponseEntity.ok(DatabaseResponse.from(instance));
+        } catch (Exception e) {
+            log.error("Failed to fetch database via API token lookup", e);
+            return ResponseEntity.status(404).body(Map.of("error", e.getMessage()));
+        }
+    }
 }

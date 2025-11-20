@@ -46,6 +46,9 @@ public class ApiToken {
     
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
+
+    @Column(name = "database_instance_id")
+    private Long databaseInstanceId;
     
     @PrePersist
     protected void onCreate() {
