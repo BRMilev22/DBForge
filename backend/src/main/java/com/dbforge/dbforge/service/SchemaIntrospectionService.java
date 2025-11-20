@@ -176,7 +176,8 @@ public class SchemaIntrospectionService {
     }
     
     private String buildJdbcUrl(DatabaseInstance instance) {
-        String host = instance.getHost();
+        // Backend always connects via localhost since Docker containers are on same server
+        String host = "localhost";
         String port = String.valueOf(instance.getPort());
         String database = instance.getDatabaseName();
         String dbType = instance.getDatabaseType().getName().toLowerCase();

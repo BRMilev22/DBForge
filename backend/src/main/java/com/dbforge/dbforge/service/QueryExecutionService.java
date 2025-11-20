@@ -23,6 +23,7 @@ public class QueryExecutionService {
         
         DatabaseInstance instance = databaseInstanceRepository.findById(instanceId)
             .orElseThrow(() -> new RuntimeException("Database instance not found"));
+        String dbType = instance.getDatabaseType().getName().toLowerCase();
             
         if (instance.getStatus() != DatabaseInstance.InstanceStatus.RUNNING) {
             return QueryResult.builder()
@@ -42,7 +43,11 @@ public class QueryExecutionService {
             }
             
             String queryType = determineQueryType(request.getQuery());
-            
+
+            if (Boolean.TRUE.equals(request.getExplain())) {
+                return executeExplainQuery(conn, request, dbType);
+            }
+
             if ("SELECT".equals(queryType)) {
                 return executeSelectQuery(conn, request);
             } else {
@@ -56,6 +61,62 @@ public class QueryExecutionService {
                 .success(false)
                 .error(e.getMessage())
                 .executionTimeMs(executionTime)
+                .build();
+        }
+    }
+
+    private QueryResult executeExplainQuery(Connection conn, QueryRequest request, String dbType) throws SQLException {
+        long startTime = System.currentTimeMillis();
+
+        String query = request.getQuery().trim();
+        if (query.endsWith(";")) {
+            query = query.substring(0, query.length() - 1).trim();
+        }
+
+        String explainStatement;
+        if ("postgresql".equals(dbType)) {
+            explainStatement = "EXPLAIN (ANALYZE, BUFFERS, VERBOSE) " + query;
+        } else if ("mysql".equals(dbType)) {
+            explainStatement = "EXPLAIN ANALYZE " + query;
+        } else if ("mariadb".equals(dbType)) {
+            explainStatement = "EXPLAIN " + query;
+        } else {
+            throw new SQLException("Explain plan not supported for database type: " + dbType);
+        }
+
+        try (Statement stmt = conn.createStatement()) {
+            ResultSet rs = stmt.executeQuery(explainStatement);
+            ResultSetMetaData metaData = rs.getMetaData();
+            int columnCount = metaData.getColumnCount();
+
+            List<String> columns = new ArrayList<>();
+            for (int i = 1; i <= columnCount; i++) {
+                columns.add(metaData.getColumnName(i));
+            }
+
+            List<Map<String, Object>> rows = new ArrayList<>();
+            int rowCount = 0;
+            while (rs.next()) {
+                Map<String, Object> row = new LinkedHashMap<>();
+                for (int i = 1; i <= columnCount; i++) {
+                    String columnName = metaData.getColumnName(i);
+                    Object value = rs.getObject(i);
+                    row.put(columnName, value);
+                }
+                rows.add(row);
+                rowCount++;
+            }
+
+            long executionTime = System.currentTimeMillis() - startTime;
+
+            return QueryResult.builder()
+                .success(true)
+                .queryType("EXPLAIN")
+                .columns(columns)
+                .rows(rows)
+                .rowCount(rowCount)
+                .executionTimeMs(executionTime)
+                .message("Explain plan generated")
                 .build();
         }
     }
@@ -163,7 +224,8 @@ public class QueryExecutionService {
     }
     
     private String buildJdbcUrl(DatabaseInstance instance) {
-        String host = instance.getHost();
+        // Backend always connects via localhost since Docker containers are on same server
+        String host = "localhost";
         String port = String.valueOf(instance.getPort());
         String database = instance.getDatabaseName();
         String dbType = instance.getDatabaseType().getName().toLowerCase();

@@ -32,6 +32,9 @@ public class DatabaseService {
     private final DockerService dockerService;
     private final ApiTokenService apiTokenService;
     
+    @Value("${app.database.host:localhost}")
+    private String databaseHost;
+    
     @Value("${port.postgres.start:5432}")
     private int postgresStart;
     @Value("${port.postgres.end:5531}")
@@ -59,9 +62,6 @@ public class DatabaseService {
     
     @Value("${resource.max.active.instances:8}")
     private int maxActiveInstances;
-    
-    @Value("${app.database.host:localhost}")
-    private String databaseHost;
     
     @Transactional
     public DatabaseInstance createDatabase(Long userId, String databaseTypeName, String instanceName, String dbUsername, String dbPassword) {
@@ -99,7 +99,7 @@ public class DatabaseService {
         instance.setDatabaseVersionId(dbVersion.getId());
         instance.setInstanceName(instanceName);
         instance.setContainerName(containerName);
-        instance.setHost("localhost"); // Backend connects via localhost, frontend uses databaseHost
+        instance.setHost(databaseHost); // Use configured host (VPS IP or domain)
         instance.setPort(port);
         instance.setDatabaseName(databaseName);
         instance.setUsername(username);

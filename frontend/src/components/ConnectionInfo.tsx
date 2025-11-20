@@ -1,4 +1,4 @@
-import { Database, Server, HardDrive, Zap, Users, Clock } from 'lucide-react';
+import { Database, Server, HardDrive, Zap, Users } from 'lucide-react';
 import type { DatabaseInstance } from '../types/database';
 
 interface ConnectionInfoProps {
@@ -24,7 +24,7 @@ export default function ConnectionInfo({ database, schema }: ConnectionInfoProps
           
           <div>
             <div className="text-xs text-zinc-600 mb-1">Type</div>
-            <div className="text-sm font-medium text-zinc-300 capitalize">{database.type}</div>
+            <div className="text-sm font-medium text-zinc-300 capitalize">{database.databaseType}</div>
           </div>
           
           <div>
@@ -43,7 +43,7 @@ export default function ConnectionInfo({ database, schema }: ConnectionInfoProps
               Host
             </div>
             <div className="text-sm font-mono text-zinc-400">
-              {database.host}:{database.port}
+              {database.connectionInfo.host}:{database.connectionInfo.port}
             </div>
           </div>
 
@@ -53,7 +53,7 @@ export default function ConnectionInfo({ database, schema }: ConnectionInfoProps
               Schema
             </div>
             <div className="text-sm font-mono text-zinc-400">
-              {schema?.databaseName || database.databaseName}
+              {schema?.databaseName || database.connectionInfo.database}
             </div>
           </div>
 
@@ -75,17 +75,17 @@ export default function ConnectionInfo({ database, schema }: ConnectionInfoProps
             <div className="flex items-center gap-2 text-xs">
               <Zap className="w-3 h-3 text-zinc-600" />
               <span className="text-zinc-500">CPU:</span>
-              <span className="text-zinc-400 font-mono">{database.cpuLimit || '0.5'}</span>
+              <span className="text-zinc-400 font-mono">0.5</span>
             </div>
             <div className="flex items-center gap-2 text-xs">
               <HardDrive className="w-3 h-3 text-zinc-600" />
               <span className="text-zinc-500">Memory:</span>
-              <span className="text-zinc-400 font-mono">{database.memoryLimit || '512m'}</span>
+              <span className="text-zinc-400 font-mono">512m</span>
             </div>
             <div className="flex items-center gap-2 text-xs">
               <Users className="w-3 h-3 text-zinc-600" />
               <span className="text-zinc-500">Max Connections:</span>
-              <span className="text-zinc-400 font-mono">{database.maxConnections || '20'}</span>
+              <span className="text-zinc-400 font-mono">20</span>
             </div>
           </div>
         </div>

@@ -1,211 +1,204 @@
-import { useState, useRef, useEffect } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { AgGridReact } from 'ag-grid-react';
-import { Plus, Trash2, Save, X, Filter, Download, Upload, RefreshCw } from 'lucide-react';
+import { Download, Filter, RefreshCw, CheckCircle, AlertCircle } from 'lucide-react';
 import 'ag-grid-community/styles/ag-grid.css';
 import 'ag-grid-community/styles/ag-theme-quartz.css';
 
 interface TableContentViewProps {
   databaseId: number;
+  databaseType: string;
   tableName: string;
-  onExecuteQuery: (query: string) => Promise<any>;
+  primaryKeys?: string[];
+  refreshSignal?: number;
+  onExecuteQuery: (query: string, limit?: number) => Promise<any>;
 }
 
-export default function TableContentView({ databaseId, tableName, onExecuteQuery }: TableContentViewProps) {
+export default function TableContentView({
+  databaseId: _databaseId,
+  databaseType,
+  tableName,
+  primaryKeys,
+  refreshSignal,
+  onExecuteQuery,
+}: TableContentViewProps) {
   const [rowData, setRowData] = useState<any[]>([]);
   const [columnDefs, setColumnDefs] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
-  const [editedRows, setEditedRows] = useState<Set<number>>(new Set());
-  const [deletedRows, setDeletedRows] = useState<Set<number>>(new Set());
-  const [newRows, setNewRows] = useState<any[]>([]);
   const [filterText, setFilterText] = useState('');
+  const [status, setStatus] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const gridRef = useRef<AgGridReact>(null);
+
+  const normalizedDb = databaseType.toLowerCase();
 
   useEffect(() => {
     loadTableData();
-  }, [tableName]);
+  }, [tableName, normalizedDb, refreshSignal]);
 
   const loadTableData = async () => {
     setLoading(true);
+    setError(null);
     try {
-      const result = await onExecuteQuery(`SELECT * FROM ${tableName} LIMIT 1000`);
-      if (result.success && result.columns && result.rows) {
-        // Create column definitions with editable cells
+      const query = buildLoadQuery();
+      const limit = normalizedDb === 'postgresql' || normalizedDb === 'mysql' || normalizedDb === 'mariadb' ? 500 : 200;
+      const result = await onExecuteQuery(query, limit);
+      if (result?.success && result.columns && result.rows) {
         const cols = result.columns.map((col: string) => ({
           field: col,
           headerName: col,
-          editable: true,
+          editable: (params: any) => isEditable(col, params?.data),
           sortable: true,
           filter: true,
           resizable: true,
         }));
         setColumnDefs(cols);
-        setRowData(result.rows.map((row: any, idx: number) => ({ ...row, _rowId: idx })));
+        setRowData(result.rows);
+      } else {
+        setError(result?.error || 'Unable to load data');
+        setRowData([]);
       }
     } catch (err) {
       console.error('Failed to load table data:', err);
+      setError(err instanceof Error ? err.message : 'Unknown load error');
+      setRowData([]);
     } finally {
       setLoading(false);
     }
   };
 
-  const onCellValueChanged = (params: any) => {
-    setEditedRows(new Set(editedRows).add(params.data._rowId));
-  };
-
-  const addNewRow = () => {
-    const newRow: any = { _rowId: Date.now(), _isNew: true };
-    columnDefs.forEach(col => {
-      newRow[col.field] = null;
-    });
-    setNewRows([...newRows, newRow]);
-    setRowData([...rowData, newRow]);
-  };
-
-  const deleteSelectedRows = () => {
-    const selectedRows = gridRef.current?.api.getSelectedRows() || [];
-    if (selectedRows.length === 0) {
-      alert('Please select rows to delete');
-      return;
+  const buildLoadQuery = () => {
+    if (normalizedDb === 'mongodb') {
+      return `db.${tableName}.find()`;
     }
-    
-    if (!confirm(`Delete ${selectedRows.length} row(s)?`)) return;
-
-    const deleted = new Set(deletedRows);
-    selectedRows.forEach((row: any) => {
-      if (!row._isNew) {
-        deleted.add(row._rowId);
-      }
-    });
-    
-    setDeletedRows(deleted);
-    setRowData(rowData.filter((row: any) => 
-      !selectedRows.some((selected: any) => selected._rowId === row._rowId)
-    ));
-  };
-
-  const saveChanges = async () => {
-    setLoading(true);
-    try {
-      // Generate UPDATE queries for edited rows
-      const updates: string[] = [];
-      editedRows.forEach(rowId => {
-        const row = rowData.find(r => r._rowId === rowId);
-        if (row && !row._isNew) {
-          const sets = Object.keys(row)
-            .filter(key => !key.startsWith('_'))
-            .map(key => `${key} = ${formatValue(row[key])}`)
-            .join(', ');
-          // Assume first column is primary key
-          const pk = columnDefs[0]?.field;
-          if (pk) {
-            updates.push(`UPDATE ${tableName} SET ${sets} WHERE ${pk} = ${formatValue(row[pk])}`);
-          }
-        }
-      });
-
-      // Generate INSERT queries for new rows
-      newRows.forEach(row => {
-        const cols = Object.keys(row).filter(key => !key.startsWith('_'));
-        const values = cols.map(col => formatValue(row[col])).join(', ');
-        updates.push(`INSERT INTO ${tableName} (${cols.join(', ')}) VALUES (${values})`);
-      });
-
-      // Generate DELETE queries
-      deletedRows.forEach(rowId => {
-        const row = rowData.find(r => r._rowId === rowId);
-        if (row) {
-          const pk = columnDefs[0]?.field;
-          if (pk) {
-            updates.push(`DELETE FROM ${tableName} WHERE ${pk} = ${formatValue(row[pk])}`);
-          }
-        }
-      });
-
-      // Execute all queries
-      for (const query of updates) {
-        await onExecuteQuery(query);
-      }
-
-      // Clear state and reload
-      setEditedRows(new Set());
-      setNewRows([]);
-      setDeletedRows(new Set());
-      await loadTableData();
-      
-      alert('Changes saved successfully!');
-    } catch (err) {
-      alert('Failed to save changes: ' + (err instanceof Error ? err.message : 'Unknown error'));
-    } finally {
-      setLoading(false);
+    if (normalizedDb === 'redis') {
+      return `KEYS ${tableName}`;
     }
+    return `SELECT * FROM ${tableName}`;
   };
 
-  const formatValue = (value: any): string => {
+  const formatSqlValue = (value: any): string => {
     if (value === null || value === undefined) return 'NULL';
     if (typeof value === 'string') return `'${value.replace(/'/g, "''")}'`;
     return String(value);
   };
 
-  const discardChanges = () => {
-    if (!confirm('Discard all unsaved changes?')) return;
-    setEditedRows(new Set());
-    setNewRows([]);
-    setDeletedRows(new Set());
-    loadTableData();
+  const formatMongoValue = (value: any): string => {
+    if (value === null || value === undefined) return 'null';
+    // Attempt to preserve numbers/booleans if possible
+    if (typeof value === 'number' || typeof value === 'boolean') return JSON.stringify(value);
+    if (typeof value === 'string' && value.trim() === '') return '""';
+    return JSON.stringify(value);
+  };
+
+  const normalizeMongoId = (raw: any): string | null => {
+    if (!raw) return null;
+    const rawStr = String(raw);
+    const match = rawStr.match(/ObjectId\([\"']?([a-fA-F0-9]{24})[\"']?\)/);
+    if (match?.[1]) return `ObjectId("${match[1]}")`;
+    // Fallback to treating as string id
+    return JSON.stringify(rawStr);
+  };
+
+  const isEditable = (field: string, row?: any) => {
+    if (field.startsWith('_') && field !== '_id') return false;
+    if (normalizedDb === 'mongodb') return field !== '_id';
+    if (normalizedDb === 'redis') return field === 'value' && row?.type === 'string';
+    return true;
+  };
+
+  const handleCellValueChanged = async (params: any) => {
+    if (params.newValue === params.oldValue) return;
+    if (!isEditable(params.colDef.field, params.data)) {
+      params.node.setDataValue(params.colDef.field, params.oldValue);
+      return;
+    }
+
+    try {
+      setStatus('Saving change...');
+      setError(null);
+
+      if (normalizedDb === 'mongodb') {
+        await updateMongoCell(params);
+      } else if (normalizedDb === 'redis') {
+        await updateRedisCell(params);
+      } else {
+        await updateSqlCell(params);
+      }
+
+      setStatus('Saved');
+      // brief status reset
+      setTimeout(() => setStatus(null), 1500);
+    } catch (err) {
+      params.node.setDataValue(params.colDef.field, params.oldValue);
+      const message = err instanceof Error ? err.message : 'Update failed';
+      setError(message);
+      setStatus(null);
+    }
+  };
+
+  const updateSqlCell = async (params: any) => {
+    const pkField = primaryKeys?.[0] || columnDefs[0]?.field;
+    if (!pkField) throw new Error('No primary key column available for update');
+
+    const pkValue = params.data[pkField];
+    if (pkValue === undefined) throw new Error('Row missing primary key value');
+
+    const query = `UPDATE ${tableName} SET ${params.colDef.field} = ${formatSqlValue(params.newValue)} WHERE ${pkField} = ${formatSqlValue(pkValue)}`;
+    await onExecuteQuery(query);
+  };
+
+  const updateMongoCell = async (params: any) => {
+    const idValue = params.data._id;
+    const normalizedId = normalizeMongoId(idValue);
+    if (!normalizedId) throw new Error('Document is missing _id, cannot update');
+
+    const setValue = formatMongoValue(params.newValue);
+    const query = `db.${tableName}.updateOne({_id: ${normalizedId}}, {$set: {${params.colDef.field}: ${setValue}}})`;
+    await onExecuteQuery(query);
+  };
+
+  const updateRedisCell = async (params: any) => {
+    const { key, type } = params.data || {};
+    if (!key) throw new Error('Missing key for Redis update');
+    if (type !== 'string') throw new Error('Inline editing is only supported for string keys');
+
+    const newValue = params.newValue === null || params.newValue === undefined ? '' : String(params.newValue);
+    const query = `SET ${key} "${newValue.replace(/"/g, '\\"')}"`;
+    await onExecuteQuery(query);
   };
 
   const exportCSV = () => {
     gridRef.current?.api.exportDataAsCsv({
-      fileName: `${tableName}_export.csv`
+      fileName: `${tableName}_export.csv`,
     });
   };
 
-  const hasChanges = editedRows.size > 0 || newRows.length > 0 || deletedRows.size > 0;
+  const alertBar = useMemo(() => {
+    if (error) {
+      return (
+        <div className="px-4 py-2 bg-rose-500/10 border-b border-rose-500/30 text-sm text-rose-300 flex items-center gap-2">
+          <AlertCircle className="w-4 h-4" />
+          <span>{error}</span>
+        </div>
+      );
+    }
+    if (status) {
+      return (
+        <div className="px-4 py-2 bg-emerald-500/10 border-b border-emerald-500/30 text-sm text-emerald-300 flex items-center gap-2">
+          <CheckCircle className="w-4 h-4" />
+          <span>{status}</span>
+        </div>
+      );
+    }
+    return null;
+  }, [error, status]);
 
   return (
     <div className="flex flex-col h-full">
-      {/* Toolbar */}
       <div className="flex items-center justify-between px-4 py-2 border-b border-zinc-800 bg-zinc-950/50">
-        <div className="flex items-center gap-2">
-          <button
-            onClick={addNewRow}
-            className="flex items-center gap-2 px-3 py-1.5 rounded bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 text-sm transition"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            Add Row
-          </button>
-          
-          <button
-            onClick={deleteSelectedRows}
-            className="flex items-center gap-2 px-3 py-1.5 rounded bg-rose-500/20 hover:bg-rose-500/30 text-rose-400 text-sm transition"
-          >
-            <Trash2 className="w-3.5 h-3.5" />
-            Delete
-          </button>
-
-          {hasChanges && (
-            <>
-              <div className="h-4 w-px bg-zinc-700" />
-              <button
-                onClick={saveChanges}
-                disabled={loading}
-                className="flex items-center gap-2 px-3 py-1.5 rounded bg-violet-500/20 hover:bg-violet-500/30 text-violet-400 text-sm transition disabled:opacity-50"
-              >
-                <Save className="w-3.5 h-3.5" />
-                Save Changes
-              </button>
-              
-              <button
-                onClick={discardChanges}
-                className="flex items-center gap-2 px-3 py-1.5 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-400 text-sm transition"
-              >
-                <X className="w-3.5 h-3.5" />
-                Discard
-              </button>
-            </>
-          )}
+        <div className="text-xs text-zinc-500">
+          Double-click to edit, click away to auto-save{normalizedDb === 'redis' ? ' (string keys only)' : ''}.
         </div>
-
         <div className="flex items-center gap-2">
           <div className="flex items-center gap-2 px-3 py-1.5 rounded bg-zinc-900 border border-zinc-800">
             <Filter className="w-3.5 h-3.5 text-zinc-500" />
@@ -240,17 +233,8 @@ export default function TableContentView({ databaseId, tableName, onExecuteQuery
         </div>
       </div>
 
-      {/* Status Bar */}
-      {hasChanges && (
-        <div className="px-4 py-2 bg-amber-500/10 border-b border-amber-500/30 text-sm text-amber-400">
-          {editedRows.size > 0 && <span>{editedRows.size} edited, </span>}
-          {newRows.length > 0 && <span>{newRows.length} new, </span>}
-          {deletedRows.size > 0 && <span>{deletedRows.size} deleted</span>}
-          <span className="ml-2">- Unsaved changes</span>
-        </div>
-      )}
+      {alertBar}
 
-      {/* Data Grid */}
       <div className="flex-1 ag-theme-quartz-dark">
         <AgGridReact
           ref={gridRef}
@@ -264,13 +248,13 @@ export default function TableContentView({ databaseId, tableName, onExecuteQuery
             resizable: true,
           }}
           rowSelection="multiple"
-          onCellValueChanged={onCellValueChanged}
           suppressRowClickSelection
           enableCellTextSelection
           ensureDomOrder
           pagination
           paginationPageSize={100}
           paginationPageSizeSelector={[50, 100, 200, 500]}
+          onCellValueChanged={handleCellValueChanged}
         />
       </div>
     </div>

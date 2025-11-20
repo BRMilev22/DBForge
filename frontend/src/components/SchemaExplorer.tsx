@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { ChevronRight, ChevronDown, Table, Columns, Key, Database as DatabaseIcon, Loader2, RefreshCw, 
-         Plus, Trash2, Edit, FileText, Copy, Download } from 'lucide-react';
+         Plus, Trash2, Edit, FileText, Copy } from 'lucide-react';
 import ConfirmDialog from './ConfirmDialog';
 
 interface SchemaExplorerProps {

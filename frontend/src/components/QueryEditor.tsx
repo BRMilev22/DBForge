@@ -1,12 +1,12 @@
 import { useState, useRef, useEffect } from 'react';
 import Editor from '@monaco-editor/react';
-import { Play, Loader2, Clock, Sparkles, Copy, Eraser, Book, History } from 'lucide-react';
+import { Play, Loader2, Sparkles, Copy, Eraser, History } from 'lucide-react';
 import type { editor } from 'monaco-editor';
 
 interface QueryEditorProps {
   databaseId: number;
   databaseType: string;
-  onQueryExecute: (query: string) => Promise<void>;
+  onQueryExecute: (query: string, options?: { explain?: boolean }) => Promise<void>;
   isExecuting: boolean;
   initialQuery?: string;
   generatedQuery?: string;
@@ -14,7 +14,7 @@ interface QueryEditorProps {
 }
 
 export default function QueryEditor({ 
-  databaseId, 
+  databaseId: _databaseId, 
   databaseType, 
   onQueryExecute, 
   isExecuting,
@@ -111,6 +111,14 @@ SET user:1:email "john@example.com"
     onQueryExecute(queryToRun);
   };
 
+  const handleExplain = () => {
+    if (!query.trim() || isExecuting) return;
+    const editor = editorRef.current;
+    const selectedText = editor?.getModel()?.getValueInRange(editor.getSelection()!);
+    const queryToRun = selectedText?.trim() || query;
+    onQueryExecute(queryToRun, { explain: true });
+  };
+
   const formatQuery = () => {
     if (!editorRef.current) return;
     editorRef.current.getAction('editor.action.formatDocument')?.run();
@@ -171,6 +179,13 @@ SET user:1:email "john@example.com"
               title="Clear Editor"
             >
               <Eraser className="w-3.5 h-3.5" />
+            </button>
+            <button
+              onClick={handleExplain}
+              className="p-1.5 rounded hover:bg-zinc-900 text-zinc-500 hover:text-amber-400 transition"
+              title="Explain / Plan"
+            >
+              <Sparkles className="w-3.5 h-3.5" />
             </button>
             {onShowHistory && (
               <button

@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
-import { X, Database as DatabaseIcon, Loader2, Plus, Code, Table as TableIcon, History, PanelLeftClose, PanelLeft } from 'lucide-react';
+import { X, Database as DatabaseIcon, Plus, Code, Table as TableIcon } from 'lucide-react';
 import QueryEditor from './QueryEditor';
 import SchemaExplorer from './SchemaExplorer';
 import ResultsGrid from './ResultsGrid';
-import QueryHistory, { addToQueryHistory } from './QueryHistory';
-import ConnectionInfo from './ConnectionInfo';
+import TableContentView from './TableContentView';
+import QueryHistory from './QueryHistory';
+import { addToQueryHistory } from './QueryHistory';
 import { databaseApi } from '../services/api';
 import type { DatabaseInstance } from '../types/database';
 
@@ -45,10 +46,10 @@ export default function DatabaseWorkbench({ database, isOpen, onClose }: Databas
   const [isExecuting, setIsExecuting] = useState(false);
   const [tabs, setTabs] = useState<Tab[]>([{ id: 'query-1', type: 'query', title: 'Query 1' }]);
   const [activeTabId, setActiveTabId] = useState('query-1');
-  const [tableData, setTableData] = useState<Record<string, any>>({});
   const [currentDatabase, setCurrentDatabase] = useState<DatabaseInstance>(database);
   const [showHistory, setShowHistory] = useState(false);
   const [generatedQuery, setGeneratedQuery] = useState<string>('');
+  const [tableRefreshTokens, setTableRefreshTokens] = useState<Record<string, number>>({});
 
   // Refresh database status when opened
   useEffect(() => {
@@ -85,11 +86,11 @@ export default function DatabaseWorkbench({ database, isOpen, onClose }: Databas
     }
   };
 
-  const handleQueryExecute = async (query: string) => {
+  const handleQueryExecute = async (query: string, options?: { explain?: boolean }) => {
     setIsExecuting(true);
     const startTime = Date.now();
     try {
-      const result = await databaseApi.executeQuery(database.id, query, 1000, 30);
+      const result = await databaseApi.executeQuery(database.id, query, 1000, 30, options?.explain);
       setQueryResult(result);
       
       // Add to history
@@ -107,24 +108,15 @@ export default function DatabaseWorkbench({ database, isOpen, onClose }: Databas
         
         // Refresh any open table tabs
         const tableTabs = tabs.filter(t => t.type === 'table' && t.tableName);
-        for (const tab of tableTabs) {
-          try {
-            let query: string;
-            const dbType = currentDatabase.databaseType.toLowerCase();
-            
-            if (dbType === 'mongodb') {
-              query = `db.${tab.tableName}.find()`;
-            } else if (dbType === 'redis') {
-              query = `KEYS ${tab.tableName}`;
-            } else {
-              query = `SELECT * FROM ${tab.tableName} LIMIT 100`;
-            }
-            
-            const tableResult = await databaseApi.executeQuery(database.id, query, 100, 30);
-            setTableData(prev => ({ ...prev, [tab.tableName!]: tableResult }));
-          } catch (error) {
-            console.error(`Failed to refresh table ${tab.tableName}:`, error);
-          }
+        if (tableTabs.length) {
+          setTableRefreshTokens(prev => {
+            const next = { ...prev };
+            tableTabs.forEach(tab => {
+              if (!tab.tableName) return;
+              next[tab.tableName] = (next[tab.tableName] || 0) + 1;
+            });
+            return next;
+          });
         }
       }
     } catch (err) {
@@ -140,11 +132,6 @@ export default function DatabaseWorkbench({ database, isOpen, onClose }: Databas
     }
   };
 
-  const handleQuerySelect = (query: string) => {
-    setGeneratedQuery(query);
-    setShowHistory(false);
-  };
-
   const handleQueryGenerate = (query: string) => {
     // Find or create a query tab
     let queryTab = tabs.find(t => t.type === 'query');
@@ -157,10 +144,16 @@ export default function DatabaseWorkbench({ database, isOpen, onClose }: Databas
     // The query will be inserted into the editor through a state update
     setGeneratedQuery(query);
     // Reset after a short delay to allow the editor to receive it
-    setTimeout(() => setGeneratedQuery(undefined), 100);
+    setTimeout(() => setGeneratedQuery(''), 100);
   };
 
-  const handleTableSelect = async (tableName: string) => {
+  const handleHistorySelect = (query: string) => {
+    // Ensure a query tab is active, then inject query
+    handleQueryGenerate(query);
+    setShowHistory(false);
+  };
+
+  const handleTableSelect = (tableName: string) => {
     // Check if tab already exists
     const existingTab = tabs.find(t => t.type === 'table' && t.tableName === tableName);
     if (existingTab) {
@@ -177,34 +170,6 @@ export default function DatabaseWorkbench({ database, isOpen, onClose }: Databas
     };
     setTabs([...tabs, newTab]);
     setActiveTabId(newTab.id);
-
-    // Load table data
-    setIsExecuting(true);
-    try {
-      // Use appropriate query syntax based on database type
-      let query: string;
-      const dbType = currentDatabase.databaseType.toLowerCase();
-      
-      if (dbType === 'mongodb') {
-        query = `db.${tableName}.find()`;
-      } else if (dbType === 'redis') {
-        // tableName already includes the pattern (e.g., "user:*")
-        query = `KEYS ${tableName}`;
-      } else {
-        query = `SELECT * FROM ${tableName} LIMIT 100`;
-      }
-      
-      const result = await databaseApi.executeQuery(database.id, query, 100, 30);
-      setTableData({ ...tableData, [tableName]: result });
-    } catch (err) {
-      setTableData({ ...tableData, [tableName]: {
-        success: false,
-        queryType: 'ERROR',
-        error: err instanceof Error ? err.message : 'Failed to load table data',
-      }});
-    } finally {
-      setIsExecuting(false);
-    }
   };
 
   const handleTableStructure = (tableName: string) => {
@@ -368,7 +333,7 @@ export default function DatabaseWorkbench({ database, isOpen, onClose }: Databas
 
             {/* Tab Content */}
             {activeTab.type === 'query' && (
-              <>
+              <div className="relative flex-1 flex flex-col">
                 <div className="h-[45%] border-b border-zinc-800">
                   <QueryEditor
                     databaseId={currentDatabase.id}
@@ -376,26 +341,49 @@ export default function DatabaseWorkbench({ database, isOpen, onClose }: Databas
                     onQueryExecute={handleQueryExecute}
                     isExecuting={isExecuting}
                     generatedQuery={generatedQuery}
+                    onShowHistory={() => setShowHistory(true)}
                   />
                 </div>
                 <div className="flex-1">
                   <ResultsGrid result={queryResult} />
                 </div>
-              </>
+
+                {showHistory && (
+                  <div className="absolute inset-y-0 right-0 w-80 max-w-full border-l border-zinc-800 bg-zinc-950 shadow-2xl shadow-black/40 z-20 flex flex-col">
+                    <div className="flex items-center justify-between px-3 py-2 border-b border-zinc-800 bg-zinc-950/90">
+                      <div className="text-xs font-medium text-zinc-400">Query History</div>
+                      <button
+                        onClick={() => setShowHistory(false)}
+                        className="px-2 py-1 text-xs rounded bg-zinc-900 hover:bg-zinc-800 text-zinc-400"
+                      >
+                        Close
+                      </button>
+                    </div>
+                    <QueryHistory
+                      databaseId={currentDatabase.id}
+                      onQuerySelect={handleHistorySelect}
+                    />
+                  </div>
+                )}
+              </div>
             )}
 
             {activeTab.type === 'table' && activeTab.tableName && (
               <div className="flex-1">
-                {isExecuting && !tableData[activeTab.tableName] ? (
-                  <div className="flex items-center justify-center h-full">
-                    <div className="text-center">
-                      <Loader2 className="w-8 h-8 animate-spin text-violet-500 mx-auto mb-2" />
-                      <p className="text-sm text-zinc-400">Loading table data...</p>
-                    </div>
-                  </div>
-                ) : (
-                  <ResultsGrid result={tableData[activeTab.tableName] || null} />
-                )}
+                <TableContentView
+                  key={activeTab.id}
+                  databaseId={currentDatabase.id}
+                  databaseType={currentDatabase.databaseType}
+                  tableName={activeTab.tableName}
+                  primaryKeys={
+                    schema?.tables
+                      .find((t) => t.name === activeTab.tableName)
+                      ?.columns.filter((c: any) => c.primaryKey)
+                      .map((c: any) => c.name)
+                  }
+                  refreshSignal={tableRefreshTokens[activeTab.tableName] || 0}
+                  onExecuteQuery={(query, limit) => databaseApi.executeQuery(currentDatabase.id, query, limit, 30)}
+                />
               </div>
             )}
 
@@ -496,7 +484,7 @@ export default function DatabaseWorkbench({ database, isOpen, onClose }: Databas
                           </tr>
                         </thead>
                         <tbody className="bg-zinc-950/50">
-                          {tableInfo.columns.map((col, idx) => (
+                          {tableInfo.columns.map((col: any, idx: number) => (
                             <tr key={idx} className="border-t border-zinc-800/50 hover:bg-zinc-900/30 transition">
                               <td className="px-3 py-2 text-sm text-zinc-300 font-mono">{col.name}</td>
                               <td className="px-3 py-2 text-sm text-zinc-400 font-mono">
@@ -545,7 +533,7 @@ export default function DatabaseWorkbench({ database, isOpen, onClose }: Databas
                             </tr>
                           </thead>
                           <tbody className="bg-zinc-950/50">
-                            {tableInfo.indexes.map((idx, i) => (
+                            {tableInfo.indexes.map((idx: any, i: number) => (
                               <tr key={i} className="border-t border-zinc-800/50 hover:bg-zinc-900/30 transition">
                                 <td className="px-3 py-2 text-sm text-zinc-300 font-mono">{idx.name}</td>
                                 <td className="px-3 py-2 text-sm">

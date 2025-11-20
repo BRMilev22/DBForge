@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { Plus, Database, RefreshCw, AlertCircle, Play, Square, Trash2, Copy, Check, Activity, Zap, HardDrive, Gauge, Clock, TrendingUp, Settings, BarChart3, FileText, Download, Code } from 'lucide-react';
 import { databaseApi, analyticsApi, type AnalyticsResponse } from './services/api';
 import CreateDatabaseModal from './components/CreateDatabaseModal';
@@ -7,7 +7,6 @@ import DatabaseDetailsModal from './components/DatabaseDetailsModal';
 import DatabaseWorkbench from './components/DatabaseWorkbench';
 import AuthModal from './components/AuthModal';
 import Landing from './components/Landing';
-import Logo from './components/Logo';
 import DatabaseTypeChart from './components/DatabaseTypeChart';
 import DatabaseStatusChart from './components/DatabaseStatusChart';
 import { useAuth } from './contexts/AuthContext';
@@ -31,6 +30,7 @@ function App() {
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [selectedDatabase, setSelectedDatabase] = useState<DatabaseInstance | null>(null);
   const [workbenchDatabase, setWorkbenchDatabase] = useState<DatabaseInstance | null>(null);
+  const [dbFilter, setDbFilter] = useState<string>('all');
 
   const showToast = (message: string, type: 'success' | 'error') => {
     const id = Date.now();
@@ -207,6 +207,10 @@ function App() {
   const runningDatabases = analytics?.metrics.runningDatabases ?? databases.filter(db => db.status === 'RUNNING').length;
   const totalStorage = analytics?.metrics.totalStorage ?? 0;
   const uptime = analytics?.metrics.uptime ?? 0;
+  const databaseTypeOptions = Array.from(new Set(databases.map(d => d.databaseType.toLowerCase())));
+  const filteredDatabases = dbFilter === 'all'
+    ? databases
+    : databases.filter(d => d.databaseType.toLowerCase() === dbFilter.toLowerCase());
 
   if (!user) {
     return (
@@ -325,25 +329,6 @@ function App() {
                 {activeTab === 'activity' && 'Track all actions and events'}
               </p>
             </div>
-
-            <div className="flex items-center gap-2">
-              <button
-                onClick={refreshOverview}
-                disabled={isRefreshing || isLoading}
-                className="px-3 py-1.5 rounded-lg border border-zinc-800 bg-zinc-900/50 hover:bg-zinc-800/50 transition flex items-center gap-2 text-xs font-medium"
-              >
-                <RefreshCw className={`w-3.5 h-3.5 ${(isRefreshing || isLoading) ? 'animate-spin' : ''}`} />
-                Refresh
-              </button>
-
-              <button
-                onClick={() => setShowDatabaseSelector(true)}
-                className="px-3 py-1.5 rounded-lg bg-gradient-to-r from-violet-500 to-fuchsia-500 hover:from-violet-400 hover:to-fuchsia-400 text-white font-medium text-xs transition-all flex items-center gap-1.5 shadow-lg shadow-violet-500/25"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                New Database
-              </button>
-            </div>
           </div>
         </header>
 
@@ -356,116 +341,70 @@ function App() {
 
         {/* Overview Tab */}
         {activeTab === 'overview' && (
-          <main className="p-6 space-y-5">
-            {/* Quick Stats */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className="group rounded-lg border border-zinc-800/50 bg-zinc-900/50 backdrop-blur-sm p-4 hover:border-zinc-700 transition-all hover:shadow-lg hover:shadow-violet-500/5 hover:-translate-y-0.5">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="w-8 h-8 rounded-lg bg-violet-500/10 border border-violet-500/20 flex items-center justify-center group-hover:border-violet-500/40 transition-colors">
-                    <Database className="w-4 h-4 text-violet-400" />
-                  </div>
-                  <TrendingUp className="w-3.5 h-3.5 text-emerald-500" />
+          <main className="p-6 space-y-6">
+            {/* Hero */}
+            <div className="rounded-2xl border border-zinc-800/60 bg-gradient-to-br from-[#0d0d12] via-[#0b0b10] to-[#0b0b0f] p-6 relative overflow-hidden">
+              <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_15%_20%,rgba(99,102,241,0.12),transparent_35%),radial-gradient(circle_at_85%_15%,rgba(16,185,129,0.12),transparent_30%)]" />
+              <div className="relative flex flex-col gap-3">
+                <div className="text-xs uppercase tracking-[0.2em] text-zinc-500">Control Room</div>
+                <h2 className="text-3xl font-semibold text-zinc-50">Operate every database from one cockpit</h2>
+                <p className="text-sm text-zinc-500 max-w-3xl">
+                  Launch instances, keep an eye on health, and dive into workbenches without leaving this view.
+                </p>
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    onClick={() => setShowDatabaseSelector(true)}
+                    className="px-4 py-2.5 rounded-lg bg-gradient-to-r from-violet-500 to-fuchsia-500 hover:from-violet-400 hover:to-fuchsia-400 text-white text-sm font-medium flex items-center gap-2 shadow-lg shadow-violet-500/25"
+                  >
+                    <Plus className="w-4 h-4" />
+                    New Database
+                  </button>
+                  <button
+                    onClick={() => setActiveTab('databases')}
+                    className="px-4 py-2.5 rounded-lg border border-zinc-800 bg-zinc-900/70 hover:bg-zinc-800/70 text-sm font-medium flex items-center gap-2"
+                  >
+                    <Database className="w-4 h-4" />
+                    Manage Instances
+                  </button>
                 </div>
-                <div className="text-2xl font-semibold text-zinc-100">{databases.length}</div>
-                <div className="text-xs text-zinc-500 mt-1">Total Databases</div>
-              </div>
-
-              <div className="group rounded-lg border border-zinc-800/50 bg-zinc-900/50 backdrop-blur-sm p-4 hover:border-zinc-700 transition-all hover:shadow-lg hover:shadow-emerald-500/5 hover:-translate-y-0.5">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="w-8 h-8 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center group-hover:border-emerald-500/40 transition-colors">
-                    <Zap className="w-4 h-4 text-emerald-400" />
-                  </div>
-                  <div className="text-[10px] text-emerald-400 font-medium px-1.5 py-0.5 bg-emerald-500/10 rounded border border-emerald-500/20">ACTIVE</div>
-                </div>
-                <div className="text-2xl font-semibold text-zinc-100">{runningDatabases}</div>
-                <div className="text-xs text-zinc-500 mt-1">Running Instances</div>
-              </div>
-
-              <div className="group rounded-lg border border-zinc-800/50 bg-zinc-900/50 backdrop-blur-sm p-4 hover:border-zinc-700 transition-all hover:shadow-lg hover:shadow-sky-500/5 hover:-translate-y-0.5">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="w-8 h-8 rounded-lg bg-sky-500/10 border border-sky-500/20 flex items-center justify-center group-hover:border-sky-500/40 transition-colors">
-                    <HardDrive className="w-4 h-4 text-sky-400" />
-                  </div>
-                </div>
-                <div className="text-2xl font-semibold text-zinc-100">{totalStorage}MB</div>
-                <div className="text-xs text-zinc-500 mt-1">Storage Used</div>
-              </div>
-
-              <div className="group rounded-lg border border-zinc-800/50 bg-zinc-900/50 backdrop-blur-sm p-4 hover:border-zinc-700 transition-all hover:shadow-lg hover:shadow-amber-500/5 hover:-translate-y-0.5">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="w-8 h-8 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center group-hover:border-amber-500/40 transition-colors">
-                    <Gauge className="w-4 h-4 text-amber-400" />
-                  </div>
-                </div>
-                <div className="text-2xl font-semibold text-zinc-100">{uptime}%</div>
-                <div className="text-xs text-zinc-500 mt-1">Uptime</div>
               </div>
             </div>
 
-            {/* Quick Actions + Recent Activity */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-              {/* Quick Actions */}
-              <div className="lg:col-span-1 rounded-lg border border-zinc-800/50 bg-zinc-900/50 backdrop-blur-sm p-4">
-                <h3 className="text-sm font-semibold text-zinc-100 mb-3">Quick Actions</h3>
-                <div className="space-y-2">
-                  <button
-                    onClick={() => setShowDatabaseSelector(true)}
-                    className="w-full p-3 rounded-lg border border-zinc-800 bg-zinc-900/50 hover:bg-zinc-800/50 hover:border-violet-500/30 transition-all text-left group"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-lg bg-violet-500/10 border border-violet-500/20 flex items-center justify-center group-hover:bg-violet-500/20 transition-colors">
-                        <Plus className="w-4 h-4 text-violet-400" />
-                      </div>
-                      <div>
-                        <div className="text-sm font-medium text-zinc-200">Create Database</div>
-                        <div className="text-xs text-zinc-500">Spin up a new instance</div>
-                      </div>
-                    </div>
-                  </button>
+            {/* Stats strip (unique) */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <StatPill
+                icon={<Database className="w-4 h-4 text-violet-300" />}
+                label="Total Databases"
+                value={databases.length}
+                accent="violet"
+              />
+              <StatPill
+                icon={<Zap className="w-4 h-4 text-emerald-300" />}
+                label="Running"
+                value={runningDatabases}
+                accent="emerald"
+              />
+              <StatPill
+                icon={<Activity className="w-4 h-4 text-rose-300" />}
+                label="Stopped"
+                value={analytics?.metrics.stoppedDatabases ?? databases.filter(d => d.status === 'STOPPED').length}
+                accent="amber"
+              />
+              <StatPill
+                icon={<HardDrive className="w-4 h-4 text-sky-300" />}
+                label="Storage Used"
+                value={`${totalStorage} MB`}
+                accent="sky"
+              />
+            </div>
 
-                  
-
-                  <button className="w-full p-3 rounded-lg border border-zinc-800 bg-zinc-900/50 hover:bg-zinc-800/50 hover:border-zinc-700 transition-all text-left group">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-lg bg-zinc-800 border border-zinc-700 flex items-center justify-center">
-                        <Download className="w-4 h-4 text-zinc-400" />
-                      </div>
-                      <div>
-                        <div className="text-sm font-medium text-zinc-200">Import Data</div>
-                        <div className="text-xs text-zinc-500">Upload existing database</div>
-                      </div>
-                    </div>
-                  </button>
-
-                  <button className="w-full p-3 rounded-lg border border-zinc-800 bg-zinc-900/50 hover:bg-zinc-800/50 hover:border-zinc-700 transition-all text-left group">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-lg bg-zinc-800 border border-zinc-700 flex items-center justify-center">
-                        <FileText className="w-4 h-4 text-zinc-400" />
-                      </div>
-                      <div>
-                        <div className="text-sm font-medium text-zinc-200">View Docs</div>
-                        <div className="text-xs text-zinc-500">API documentation</div>
-                      </div>
-                    </div>
-                  </button>
-                </div>
-              </div>
-
-              {/* Recent Activity Feed */}
-              <div className="lg:col-span-2 rounded-lg border border-zinc-800/50 bg-zinc-900/50 backdrop-blur-sm p-4">
-                <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-sm font-semibold text-zinc-100">Recent Activity</h3>
-                  <button 
-                    onClick={() => setActiveTab('activity')}
-                    className="text-xs text-zinc-400 hover:text-zinc-300 transition"
-                  >
-                    View all
-                  </button>
-                </div>
+            {/* Activity + charts */}
+            <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 items-start">
+              <Card title="Recent Activity" actionLabel="View all" onAction={() => setActiveTab('activity')}>
                 <div className="space-y-2">
                   {analytics?.recentActivity && analytics.recentActivity.length > 0 ? (
-                    analytics.recentActivity.slice(0, 5).map((activity) => (
-                      <div key={activity.id} className="flex items-center gap-3 p-2.5 rounded-lg bg-zinc-800/30 border border-zinc-800/50">
+                    analytics.recentActivity.slice(0, 6).map((activity) => (
+                      <div key={activity.id} className="flex items-center gap-3 p-2.5 rounded-lg bg-zinc-900/60 border border-zinc-800/60">
                         <div className={`w-1.5 h-1.5 rounded-full ${
                           activity.status === 'RUNNING' ? 'bg-emerald-500' :
                           activity.status === 'STOPPED' ? 'bg-zinc-500' :
@@ -478,11 +417,7 @@ function App() {
                         </div>
                         <div className="flex items-center gap-1 text-[11px] text-zinc-500">
                           <Clock className="w-3 h-3" />
-                          {new Date(activity.timestamp).toLocaleString('en-US', { 
-                            hour: 'numeric', 
-                            minute: '2-digit',
-                            hour12: true 
-                          })}
+                          {new Date(activity.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                         </div>
                       </div>
                     ))
@@ -493,72 +428,50 @@ function App() {
                     </div>
                   )}
                 </div>
+              </Card>
+
+              <div className="xl:col-span-2 space-y-4">
+                {analytics && (
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    <Card title="Database Types">
+                      {analytics.databasesByType.labels.length > 0 ? (
+                        <DatabaseTypeChart 
+                          labels={analytics.databasesByType.labels}
+                          values={analytics.databasesByType.values}
+                        />
+                      ) : (
+                        <EmptyChart />
+                      )}
+                    </Card>
+
+                    <Card title="Instance Status">
+                      {analytics.databasesByStatus.labels.length > 0 ? (
+                        <DatabaseStatusChart 
+                          labels={analytics.databasesByStatus.labels}
+                          values={analytics.databasesByStatus.values}
+                        />
+                      ) : (
+                        <EmptyChart />
+                      )}
+                    </Card>
+                  </div>
+                )}
               </div>
             </div>
 
-            {/* Analytics Charts */}
-            {analytics && (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-                {/* Database Types Distribution */}
-                <div className="rounded-lg border border-zinc-800/50 bg-zinc-900/50 backdrop-blur-sm p-4">
-                  <h3 className="text-sm font-semibold text-zinc-100 mb-3">Database Types</h3>
-                  {analytics.databasesByType.labels.length > 0 ? (
-                    <DatabaseTypeChart 
-                      labels={analytics.databasesByType.labels}
-                      values={analytics.databasesByType.values}
-                    />
-                  ) : (
-                    <div className="h-64 flex items-center justify-center text-zinc-500">
-                      <div className="text-center">
-                        <BarChart3 className="w-10 h-10 mx-auto mb-2 opacity-20" />
-                        <p className="text-xs">No data available</p>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Status Distribution */}
-                <div className="rounded-lg border border-zinc-800/50 bg-zinc-900/50 backdrop-blur-sm p-4">
-                  <h3 className="text-sm font-semibold text-zinc-100 mb-3">Instance Status</h3>
-                  {analytics.databasesByStatus.labels.length > 0 ? (
-                    <DatabaseStatusChart 
-                      labels={analytics.databasesByStatus.labels}
-                      values={analytics.databasesByStatus.values}
-                    />
-                  ) : (
-                    <div className="h-64 flex items-center justify-center text-zinc-500">
-                      <div className="text-center">
-                        <BarChart3 className="w-10 h-10 mx-auto mb-2 opacity-20" />
-                        <p className="text-xs">No data available</p>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* Active Databases Preview */}
+            {/* Active DBs row */}
             {databases.length > 0 && (
-              <div className="rounded-lg border border-zinc-800/50 bg-zinc-900/50 backdrop-blur-sm p-4">
-                <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-sm font-semibold text-zinc-100">Active Databases</h3>
-                  <button
-                    onClick={() => setActiveTab('databases')}
-                    className="text-xs text-zinc-400 hover:text-zinc-300 transition"
-                  >
-                    View all →
-                  </button>
-                </div>
+              <Card title="Active Databases" actionLabel="Manage all" onAction={() => setActiveTab('databases')}>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {databases.filter(db => db.status === 'RUNNING').slice(0, 3).map((db) => (
-                    <div key={db.id} className="p-3 rounded-lg border border-zinc-800 bg-zinc-800/30 hover:bg-zinc-800/50 hover:border-emerald-500/30 transition-all group cursor-pointer">
+                  {databases.filter(db => db.status === 'RUNNING').slice(0, 6).map((db) => (
+                    <div key={db.id} className="p-3 rounded-lg border border-zinc-800 bg-zinc-900/60 hover:border-emerald-500/30 transition-all group cursor-pointer">
                       <div className="flex items-center gap-2 mb-2">
                         <Database className="w-4 h-4 text-zinc-400" />
                         <div className="flex-1 min-w-0">
                           <div className="text-sm font-medium text-zinc-200 truncate">{db.instanceName}</div>
                           <div className="text-[11px] text-zinc-500">{db.databaseType}</div>
                         </div>
-                        <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_8px_2px_rgba(16,185,129,0.4)] animate-pulse" />
+                        <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_8px_2px_rgba(16,185,129,0.35)] animate-pulse" />
                       </div>
                       <div className="text-[11px] text-zinc-500 font-mono">
                         {db.connectionInfo.host}:{db.connectionInfo.port}
@@ -566,8 +479,28 @@ function App() {
                     </div>
                   ))}
                 </div>
-              </div>
+              </Card>
             )}
+
+            {/* Secondary actions (no duplicates) */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <ActionCard
+                title="Import data"
+                subtitle="Bring dumps/CSV (coming soon)"
+                icon={<Download className="w-4 h-4" />}
+              />
+              <ActionCard
+                title="Docs & API"
+                subtitle="Endpoints and guides"
+                icon={<FileText className="w-4 h-4" />}
+              />
+              <ActionCard
+                title="Activity log"
+                subtitle="Deep dive on recent actions"
+                icon={<Activity className="w-4 h-4" />}
+                onClick={() => setActiveTab('activity')}
+              />
+            </div>
           </main>
         )}
 
@@ -595,28 +528,55 @@ function App() {
                 </div>
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {databases.map((db) => (
-                  <div
-                    key={db.id}
-                    onClick={() => setSelectedDatabase(db)}
-                    className="group rounded-lg border border-zinc-800/50 bg-zinc-900/50 backdrop-blur-sm hover:border-zinc-700 transition-all p-4 space-y-3 cursor-pointer hover:shadow-xl hover:shadow-violet-500/5 hover:-translate-y-1 duration-300"
+              <div className="space-y-4">
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    onClick={() => setDbFilter('all')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium border ${
+                      dbFilter === 'all'
+                        ? 'border-violet-500/40 bg-violet-500/15 text-violet-100'
+                        : 'border-zinc-800 bg-zinc-900/60 text-zinc-400 hover:border-zinc-700 hover:text-zinc-200'
+                    }`}
                   >
+                    All types
+                  </button>
+                  {databaseTypeOptions.map(type => (
+                    <button
+                      key={type}
+                      onClick={() => setDbFilter(type)}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-medium border capitalize ${
+                        dbFilter === type
+                          ? 'border-violet-500/40 bg-violet-500/15 text-violet-100'
+                          : 'border-zinc-800 bg-zinc-900/60 text-zinc-400 hover:border-zinc-700 hover:text-zinc-200'
+                      }`}
+                    >
+                      {type}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {filteredDatabases.map((db) => (
+                    <div
+                      key={db.id}
+                      onClick={() => setSelectedDatabase(db)}
+                      className="group rounded-2xl border border-zinc-800/70 bg-gradient-to-br from-[#0e0e12] via-[#0b0b0f] to-[#0d0d12] p-5 space-y-4 cursor-pointer hover:border-violet-500/40 transition-all hover:-translate-y-0.5 hover:shadow-lg hover:shadow-violet-500/10"
+                    >
                     <div className="flex items-start justify-between">
                       <div className="flex items-center gap-2.5">
-                        <div className={`w-9 h-9 rounded-lg border border-zinc-800 bg-zinc-800/50 flex items-center justify-center ${getDatabaseIcon(db.databaseType)}`}>
+                        <div className={`w-10 h-10 rounded-lg border border-zinc-800 bg-zinc-900/70 flex items-center justify-center ${getDatabaseIcon(db.databaseType)}`}>
                           <Database className="w-4 h-4" />
                         </div>
                         <div>
-                          <h3 className="text-sm font-semibold text-zinc-100">{db.instanceName}</h3>
+                          <h3 className="text-base font-semibold text-zinc-100">{db.instanceName}</h3>
                           <p className="text-[11px] text-zinc-500 uppercase tracking-wider">{db.databaseType}</p>
                         </div>
                       </div>
-                      <div className={`w-2 h-2 rounded-full ${getStatusColor(db.status)}`} />
+                      <div className={`w-2.5 h-2.5 rounded-full ${getStatusColor(db.status)}`} />
                     </div>
 
                     <div className="flex items-center gap-1.5">
-                      <span className={`px-2 py-0.5 rounded text-[11px] font-medium ${
+                      <span className={`px-2.5 py-1 rounded-md text-[11px] font-medium ${
                         db.status === 'RUNNING' 
                           ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
                           : db.status === 'STOPPED'
@@ -627,15 +587,15 @@ function App() {
                       </span>
                     </div>
 
-                    <div className="space-y-2">
-                      <div className="bg-zinc-950/50 border border-zinc-800/50 rounded-lg p-2.5">
+                    <div className="space-y-3">
+                      <div className="bg-zinc-950/70 border border-zinc-800/70 rounded-xl p-3">
                         <div className="flex items-center justify-between mb-1">
                           <span className="text-[10px] uppercase tracking-wider text-zinc-500 font-medium">Host</span>
                         </div>
                         <code className="text-[11px] text-zinc-300 font-mono">{db.connectionInfo.host}:{db.connectionInfo.port}</code>
                       </div>
 
-                      <div className="bg-zinc-950/50 border border-zinc-800/50 rounded-lg p-2.5">
+                      <div className="bg-zinc-950/70 border border-zinc-800/70 rounded-xl p-3">
                         <div className="flex items-center justify-between mb-1">
                           <span className="text-[10px] uppercase tracking-wider text-zinc-500 font-medium">Connection</span>
                           <button
@@ -702,8 +662,9 @@ function App() {
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
                     </div>
-                  </div>
-                ))}
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
           </main>
@@ -795,6 +756,96 @@ function App() {
           onClose={() => setWorkbenchDatabase(null)}
         />
       )}
+    </div>
+  );
+}
+
+type StatPillProps = {
+  icon: ReactNode;
+  label: string;
+  value: string | number;
+  accent: 'violet' | 'emerald' | 'sky' | 'amber';
+};
+
+function StatPill({ icon, label, value, accent }: StatPillProps) {
+  const accentClasses: Record<StatPillProps['accent'], string> = {
+    violet: 'bg-violet-500/10 border-violet-500/20 text-violet-100',
+    emerald: 'bg-emerald-500/10 border-emerald-500/20 text-emerald-100',
+    sky: 'bg-sky-500/10 border-sky-500/20 text-sky-100',
+    amber: 'bg-amber-500/10 border-amber-500/20 text-amber-100',
+  };
+
+  return (
+    <div className="rounded-xl border border-zinc-800/70 bg-[#0f1014] p-3 flex flex-col gap-1.5">
+      <div className="flex items-center justify-between">
+        <div className={`w-9 h-9 rounded-lg border ${accentClasses[accent]} flex items-center justify-center`}>
+          {icon}
+        </div>
+        <span className="text-[10px] uppercase tracking-[0.18em] text-zinc-500">{label}</span>
+      </div>
+      <div className="text-xl font-semibold text-zinc-50 leading-tight">{value}</div>
+    </div>
+  );
+}
+
+type ActionCardProps = {
+  title: string;
+  subtitle: string;
+  icon: ReactNode;
+  onClick?: () => void;
+};
+
+function ActionCard({ title, subtitle, icon, onClick }: ActionCardProps) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={!onClick}
+      className="group rounded-xl border border-zinc-800/60 bg-[#0d0d12] p-4 text-left hover:border-zinc-700 transition shadow-sm hover:shadow-lg hover:shadow-black/30 disabled:opacity-70"
+    >
+      <div className="flex items-center gap-3 mb-2">
+        <div className="w-9 h-9 rounded-lg bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-300 group-hover:text-white">
+          {icon}
+        </div>
+        <div className="text-sm font-semibold text-zinc-100">{title}</div>
+      </div>
+      <div className="text-xs text-zinc-500">{subtitle}</div>
+    </button>
+  );
+}
+
+type CardProps = {
+  title: string;
+  actionLabel?: string;
+  onAction?: () => void;
+  children: ReactNode;
+};
+
+function Card({ title, actionLabel, onAction, children }: CardProps) {
+  return (
+    <div className="rounded-2xl border border-zinc-800/60 bg-[#0c0c10] p-4 h-full">
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="text-sm font-semibold text-zinc-100">{title}</h3>
+        {actionLabel && onAction && (
+          <button
+            onClick={onAction}
+            className="text-xs text-zinc-400 hover:text-zinc-200 transition"
+          >
+            {actionLabel}
+          </button>
+        )}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function EmptyChart() {
+  return (
+    <div className="h-64 flex items-center justify-center text-zinc-500">
+      <div className="text-center">
+        <BarChart3 className="w-10 h-10 mx-auto mb-2 opacity-20" />
+        <p className="text-xs">No data available</p>
+      </div>
     </div>
   );
 }

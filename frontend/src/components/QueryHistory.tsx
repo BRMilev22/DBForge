@@ -9,6 +9,8 @@ interface QueryHistoryItem {
   executionTime?: number;
   status: 'success' | 'error';
   bookmarked: boolean;
+  // Legacy items may not have been pre-cleaned
+  _cleaned?: string;
 }
 
 interface QueryHistoryProps {
@@ -27,7 +29,8 @@ export default function QueryHistory({ databaseId, onQuerySelect }: QueryHistory
       const parsed = JSON.parse(stored);
       setHistory(parsed.map((item: any) => ({
         ...item,
-        timestamp: new Date(item.timestamp)
+        timestamp: new Date(item.timestamp),
+        _cleaned: cleanQueryForDisplay(item.query || '')
       })));
     }
   }, [databaseId]);
@@ -130,9 +133,7 @@ export default function QueryHistory({ databaseId, onQuerySelect }: QueryHistory
                   
                   <div className="flex-1 min-w-0">
                     <pre className="text-xs text-zinc-300 font-mono mb-2 whitespace-pre-wrap break-words">
-                      {item.query.length > 100
-                        ? item.query.substring(0, 100) + '...'
-                        : item.query}
+                      {cleanQueryForDisplay(item.query)}
                     </pre>
                     
                     <div className="flex items-center gap-3 text-xs text-zinc-600">
@@ -161,13 +162,13 @@ export default function QueryHistory({ databaseId, onQuerySelect }: QueryHistory
                     >
                       <Play className="w-3.5 h-3.5" />
                     </button>
-                    <button
-                      onClick={() => navigator.clipboard.writeText(item.query)}
-                      className="p-1.5 rounded hover:bg-zinc-800 text-zinc-500 hover:text-sky-400 transition"
-                      title="Copy"
-                    >
-                      <Copy className="w-3.5 h-3.5" />
-                    </button>
+                  <button
+                    onClick={() => navigator.clipboard.writeText(item._cleaned || cleanQueryForDisplay(item.query))}
+                    className="p-1.5 rounded hover:bg-zinc-800 text-zinc-500 hover:text-sky-400 transition"
+                    title="Copy"
+                  >
+                    <Copy className="w-3.5 h-3.5" />
+                  </button>
                     <button
                       onClick={() => deleteItem(item.id)}
                       className="p-1.5 rounded hover:bg-zinc-800 text-zinc-500 hover:text-rose-400 transition"
@@ -193,19 +194,41 @@ export function addToQueryHistory(
   executionTime: number,
   status: 'success' | 'error'
 ) {
+  const cleanedQuery = cleanQueryForDisplay(query);
+  
+  if (!cleanedQuery.trim()) return;
+
   const stored = localStorage.getItem(`query_history_${databaseId}`);
   const history = stored ? JSON.parse(stored) : [];
   
   const newItem = {
     id: Date.now().toString(),
-    query: query.trim(),
+    query: cleanedQuery,
     timestamp: new Date().toISOString(),
     executionTime,
     status,
-    bookmarked: false
+    bookmarked: false,
+    _cleaned: cleanedQuery
   };
   
   // Keep last 100 queries
   const newHistory = [newItem, ...history].slice(0, 100);
   localStorage.setItem(`query_history_${databaseId}`, JSON.stringify(newHistory));
+}
+
+// Remove comments and unnecessary whitespace for storage/display
+function cleanQueryForDisplay(query: string) {
+  if (!query) return '';
+
+  // Strip block comments
+  let cleaned = query.replace(/\/\*[\s\S]*?\*\//g, ' ');
+
+  // Strip line comments and empty lines
+  const lines = cleaned
+    .split('\n')
+    .map(line => line.trim())
+    .filter(line => line && !line.startsWith('--') && !line.startsWith('#') && !line.startsWith('//'));
+
+  cleaned = lines.join('\n').trim();
+  return cleaned;
 }

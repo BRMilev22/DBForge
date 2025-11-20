@@ -11,7 +11,7 @@ interface ExportImportDialogProps {
 }
 
 export default function ExportImportDialog({
-  databaseId,
+  databaseId: _databaseId,
   tableName,
   isOpen,
   mode,

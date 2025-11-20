@@ -190,3 +190,34 @@ html {
   background-color: #09090b;
   padding: 8px 12px;
 }
+
+/* Focus/selection styling to keep dark readability */
+.ag-theme-quartz-dark .ag-row.ag-row-focus .ag-cell,
+.ag-theme-quartz-dark .ag-row-hover .ag-cell {
+  background-color: #141418 !important;
+  color: #e4e4e7 !important;
+}
+
+.ag-theme-quartz-dark .ag-cell-focus {
+  box-shadow: inset 0 0 0 1px #8b5cf6 !important;
+  background-color: #111118 !important;
+}
+
+.ag-theme-quartz-dark .ag-cell-inline-editing {
+  background-color: #0f172a !important;
+  color: #f8fafc !important;
+  box-shadow: inset 0 0 0 1px #8b5cf6 !important;
+  border-color: #8b5cf6 !important;
+}
+
+.ag-theme-quartz-dark .ag-cell-inline-editing input,
+.ag-theme-quartz-dark .ag-cell-inline-editing textarea {
+  background-color: #0f172a !important;
+  color: #f8fafc !important;
+  border: 1px solid #8b5cf6 !important;
+}
+
+.ag-theme-quartz-dark .ag-cell-inline-editing input::placeholder,
+.ag-theme-quartz-dark .ag-cell-inline-editing textarea::placeholder {
+  color: #9ca3af !important;
+}

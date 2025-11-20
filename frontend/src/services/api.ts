@@ -91,11 +91,12 @@ export const databaseApi = {
   },
 
   // Execute query on database
-  executeQuery: async (id: number, query: string, limit?: number, timeout?: number) => {
+  executeQuery: async (id: number, query: string, limit?: number, timeout?: number, explain?: boolean) => {
     const response = await api.post(`/databases/${id}/query`, {
       query,
       limit,
       timeout,
+      explain,
     });
     return response.data;
   },
@@ -114,4 +115,3 @@ export const analyticsApi = {
     return response.data;
   },
 };
-

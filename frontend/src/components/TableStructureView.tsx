@@ -33,11 +33,17 @@ interface TableStructureViewProps {
   onExecuteQuery: (query: string) => Promise<any>;
 }
 
-export default function TableStructureView({ databaseId, tableName, schema, onExecuteQuery }: TableStructureViewProps) {
+export default function TableStructureView({ 
+  databaseId: _databaseId, 
+  tableName, 
+  schema, 
+  onExecuteQuery: _onExecuteQuery 
+}: TableStructureViewProps) {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [activeTab, setActiveTab] = useState<'columns' | 'indexes' | 'foreign-keys'>('columns');
   const [columns, setColumns] = useState<Column[]>([]);
   const [indexes, setIndexes] = useState<Index[]>([]);
-  const [foreignKeys, setForeignKeys] = useState<ForeignKey[]>([]);
+  const [_foreignKeys, _setForeignKeys] = useState<ForeignKey[]>([]);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -49,7 +55,7 @@ export default function TableStructureView({ databaseId, tableName, schema, onEx
     if (table) {
       setColumns(table.columns || []);
       setIndexes(table.indexes || []);
-      setForeignKeys([]);  // Would need backend support
+      _setForeignKeys([]);  // Would need backend support
     }
   };
 
@@ -80,8 +86,6 @@ export default function TableStructureView({ databaseId, tableName, schema, onEx
     setLoading(true);
     try {
       // Generate ALTER TABLE statements
-      const queries: string[] = [];
-      
       // This is simplified - real implementation would need to track changes
       // and generate appropriate ADD COLUMN, MODIFY COLUMN, DROP COLUMN statements
       
