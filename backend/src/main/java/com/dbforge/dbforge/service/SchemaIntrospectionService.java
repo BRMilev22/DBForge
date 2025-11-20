@@ -230,18 +230,7 @@ public class SchemaIntrospectionService {
     
     private SchemaInfo getMongoDBSchema(DatabaseInstance instance) {
         try {
-            List<String> collections = mongoDBQueryService.getCollections(instance);
-            List<SchemaInfo.TableInfo> tables = new ArrayList<>();
-            
-            for (String collectionName : collections) {
-                tables.add(SchemaInfo.TableInfo.builder()
-                    .name(collectionName)
-                    .type("COLLECTION")
-                    .rowCount(null)
-                    .columns(new ArrayList<>())
-                    .indexes(new ArrayList<>())
-                    .build());
-            }
+            List<SchemaInfo.TableInfo> tables = mongoDBQueryService.getCollectionsWithSchema(instance);
             
             return SchemaInfo.builder()
                 .databaseName(instance.getDatabaseName())

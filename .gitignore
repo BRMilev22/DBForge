@@ -22,6 +22,9 @@ frontend/.vite/
 frontend/.env.local
 frontend/.env.production
 
+# Framework (Node)
+framework/node_modules
+
 # IDEs
 .vscode/
 .idea/

@@ -85,81 +85,125 @@ export default function SchemaExplorer({ schema, isLoading, databaseType, onTabl
 
   const handleGenerateSelect = () => {
     if (contextMenu) {
-      const columns = contextMenu.table.columns.map(c => c.name).join(', ');
-      onQueryGenerate?.(`SELECT ${columns}\nFROM ${contextMenu.table.name};`);
+      if (databaseType === 'mongodb') {
+        onQueryGenerate?.(`db.${contextMenu.table.name}.find({})`);
+      } else {
+        const columns = contextMenu.table.columns.map(c => c.name).join(', ');
+        onQueryGenerate?.(`SELECT ${columns}\nFROM ${contextMenu.table.name};`);
+      }
       setContextMenu(null);
     }
   };
 
   const handleGenerateInsert = () => {
     if (contextMenu) {
-      const columns = contextMenu.table.columns.map(c => c.name).join(', ');
-      // Generate appropriate placeholders based on column type
-      const values = contextMenu.table.columns.map(c => {
-        const type = c.dataType.toLowerCase();
-        const name = c.name.toLowerCase();
-        
-        // For timestamp/date columns, use NOW() or CURRENT_TIMESTAMP
-        if (type.includes('timestamp') || type.includes('datetime') || 
-            (type.includes('date') && !type.includes('update')) ||
-            name.includes('created_at') || name.includes('updated_at') || 
-            name.includes('createdat') || name.includes('updatedat')) {
-          return 'NOW()';
-        }
-        
-        // For numeric types, use unquoted placeholder
-        if (type.includes('int') || type.includes('numeric') || type.includes('decimal') || 
-            type.includes('float') || type.includes('double') || type.includes('real') ||
-            type.includes('serial') || type.includes('bigserial') || type.includes('smallserial')) {
-          return '?';
-        }
-        
-        // For all other types (text, varchar, etc.), use quoted placeholder
-        return "'?'";
-      }).join(', ');
-      onQueryGenerate?.(`INSERT INTO ${contextMenu.table.name} (${columns})\nVALUES (${values});`);
+      if (databaseType === 'mongodb') {
+        // Generate MongoDB insertOne with sample fields
+        const fields = contextMenu.table.columns
+          .filter(c => c.name !== '_id') // Skip _id as it's auto-generated
+          .map(c => {
+            const type = c.dataType.toLowerCase();
+            if (type.includes('string') || type === 'objectid') {
+              return `${c.name}: "?"`;
+            } else if (type.includes('int') || type.includes('double') || type.includes('long')) {
+              return `${c.name}: ?`;
+            } else if (type.includes('boolean')) {
+              return `${c.name}: true`;
+            } else if (type.includes('date')) {
+              return `${c.name}: new Date()`;
+            }
+            return `${c.name}: "?"`;
+          }).join(', ');
+        onQueryGenerate?.(`db.${contextMenu.table.name}.insertOne({${fields}})`);
+      } else {
+        const columns = contextMenu.table.columns.map(c => c.name).join(', ');
+        // Generate appropriate placeholders based on column type
+        const values = contextMenu.table.columns.map(c => {
+          const type = c.dataType.toLowerCase();
+          const name = c.name.toLowerCase();
+          
+          // For timestamp/date columns, use NOW() or CURRENT_TIMESTAMP
+          if (type.includes('timestamp') || type.includes('datetime') || 
+              (type.includes('date') && !type.includes('update')) ||
+              name.includes('created_at') || name.includes('updated_at') || 
+              name.includes('createdat') || name.includes('updatedat')) {
+            return 'NOW()';
+          }
+          
+          // For numeric types, use unquoted placeholder
+          if (type.includes('int') || type.includes('numeric') || type.includes('decimal') || 
+              type.includes('float') || type.includes('double') || type.includes('real') ||
+              type.includes('serial') || type.includes('bigserial') || type.includes('smallserial')) {
+            return '?';
+          }
+          
+          // For all other types (text, varchar, etc.), use quoted placeholder
+          return "'?'";
+        }).join(', ');
+        onQueryGenerate?.(`INSERT INTO ${contextMenu.table.name} (${columns})\nVALUES (${values});`);
+      }
       setContextMenu(null);
     }
   };
 
   const handleGenerateUpdate = () => {
     if (contextMenu) {
-      const sets = contextMenu.table.columns.filter(c => !c.primaryKey).map(c => {
-        const type = c.dataType.toLowerCase();
-        const name = c.name.toLowerCase();
+      if (databaseType === 'mongodb') {
+        // Generate MongoDB updateOne
+        const updateFields = contextMenu.table.columns
+          .filter(c => c.name !== '_id')
+          .map(c => {
+            const type = c.dataType.toLowerCase();
+            if (type.includes('string') || type === 'objectid') {
+              return `${c.name}: "?"`;
+            } else if (type.includes('int') || type.includes('double') || type.includes('long')) {
+              return `${c.name}: ?`;
+            }
+            return `${c.name}: "?"`;
+          }).join(', ');
+        onQueryGenerate?.(`db.${contextMenu.table.name}.updateOne({_id: ObjectId("?")}, {$set: {${updateFields}}})`);
+      } else {
+        const sets = contextMenu.table.columns.filter(c => !c.primaryKey).map(c => {
+          const type = c.dataType.toLowerCase();
+          const name = c.name.toLowerCase();
+          
+          // For timestamp/date columns, use NOW()
+          if (type.includes('timestamp') || type.includes('datetime') || 
+              (type.includes('date') && !type.includes('update')) ||
+              name.includes('updated_at') || name.includes('updatedat') || 
+              name.includes('modified_at') || name.includes('modifiedat')) {
+            return `${c.name} = NOW()`;
+          }
+          
+          // For numeric types, use unquoted placeholder
+          if (type.includes('int') || type.includes('numeric') || type.includes('decimal') || 
+              type.includes('float') || type.includes('double') || type.includes('real') ||
+              type.includes('serial') || type.includes('bigserial') || type.includes('smallserial')) {
+            return `${c.name} = ?`;
+          }
+          
+          // For all other types (text, varchar, etc.), use quoted placeholder
+          return `${c.name} = '?'`;
+        }).join(',\n  ');
         
-        // For timestamp/date columns, use NOW()
-        if (type.includes('timestamp') || type.includes('datetime') || 
-            (type.includes('date') && !type.includes('update')) ||
-            name.includes('updated_at') || name.includes('updatedat') || 
-            name.includes('modified_at') || name.includes('modifiedat')) {
-          return `${c.name} = NOW()`;
-        }
+        const pkCol = contextMenu.table.columns.find(c => c.primaryKey)?.name || 'id';
+        const pkType = contextMenu.table.columns.find(c => c.primaryKey)?.dataType.toLowerCase() || '';
+        const pkValue = pkType.includes('int') || pkType.includes('numeric') || pkType.includes('serial') ? '?' : "'?'";
         
-        // For numeric types, use unquoted placeholder
-        if (type.includes('int') || type.includes('numeric') || type.includes('decimal') || 
-            type.includes('float') || type.includes('double') || type.includes('real') ||
-            type.includes('serial') || type.includes('bigserial') || type.includes('smallserial')) {
-          return `${c.name} = ?`;
-        }
-        
-        // For all other types (text, varchar, etc.), use quoted placeholder
-        return `${c.name} = '?'`;
-      }).join(',\n  ');
-      
-      const pkCol = contextMenu.table.columns.find(c => c.primaryKey)?.name || 'id';
-      const pkType = contextMenu.table.columns.find(c => c.primaryKey)?.dataType.toLowerCase() || '';
-      const pkValue = pkType.includes('int') || pkType.includes('numeric') || pkType.includes('serial') ? '?' : "'?'";
-      
-      onQueryGenerate?.(`UPDATE ${contextMenu.table.name}\nSET\n  ${sets}\nWHERE ${pkCol} = ${pkValue};`);
+        onQueryGenerate?.(`UPDATE ${contextMenu.table.name}\nSET\n  ${sets}\nWHERE ${pkCol} = ${pkValue};`);
+      }
       setContextMenu(null);
     }
   };
 
   const handleGenerateDelete = () => {
     if (contextMenu) {
-      const pkCol = contextMenu.table.columns.find(c => c.primaryKey)?.name || 'id';
-      onQueryGenerate?.(`DELETE FROM ${contextMenu.table.name}\nWHERE ${pkCol} = ?;`);
+      if (databaseType === 'mongodb') {
+        onQueryGenerate?.(`db.${contextMenu.table.name}.deleteOne({_id: ObjectId("?")})`);
+      } else {
+        const pkCol = contextMenu.table.columns.find(c => c.primaryKey)?.name || 'id';
+        onQueryGenerate?.(`DELETE FROM ${contextMenu.table.name}\nWHERE ${pkCol} = ?;`);
+      }
       setContextMenu(null);
     }
   };
@@ -167,15 +211,27 @@ export default function SchemaExplorer({ schema, isLoading, databaseType, onTabl
   const handleTruncateTable = () => {
     if (contextMenu) {
       const tableName = contextMenu.table.name;
-      setConfirmDialog({
-        title: 'Truncate Table',
-        message: `Are you sure you want to truncate table "${tableName}"? This will delete all rows but keep the table structure.`,
-        variant: 'warning',
-        action: () => {
-          onQueryExecute?.(`TRUNCATE TABLE ${tableName};`);
-          setConfirmDialog(null);
-        }
-      });
+      if (databaseType === 'mongodb') {
+        setConfirmDialog({
+          title: 'Delete All Documents',
+          message: `Are you sure you want to delete all documents from collection "${tableName}"? This will keep the collection structure.`,
+          variant: 'warning',
+          action: () => {
+            onQueryExecute?.(`db.${tableName}.deleteMany({})`);
+            setConfirmDialog(null);
+          }
+        });
+      } else {
+        setConfirmDialog({
+          title: 'Truncate Table',
+          message: `Are you sure you want to truncate table "${tableName}"? This will delete all rows but keep the table structure.`,
+          variant: 'warning',
+          action: () => {
+            onQueryExecute?.(`TRUNCATE TABLE ${tableName};`);
+            setConfirmDialog(null);
+          }
+        });
+      }
       setContextMenu(null);
     }
   };
@@ -183,15 +239,27 @@ export default function SchemaExplorer({ schema, isLoading, databaseType, onTabl
   const handleDropTable = () => {
     if (contextMenu) {
       const tableName = contextMenu.table.name;
-      setConfirmDialog({
-        title: 'Drop Table',
-        message: `Are you sure you want to DROP table "${tableName}"? This action cannot be undone and will permanently delete the table and all its data.`,
-        variant: 'danger',
-        action: () => {
-          onQueryExecute?.(`DROP TABLE ${tableName};`);
-          setConfirmDialog(null);
-        }
-      });
+      if (databaseType === 'mongodb') {
+        setConfirmDialog({
+          title: 'Drop Collection',
+          message: `Are you sure you want to DROP collection "${tableName}"? This action cannot be undone and will permanently delete the collection and all its documents.`,
+          variant: 'danger',
+          action: () => {
+            onQueryExecute?.(`db.${tableName}.drop()`);
+            setConfirmDialog(null);
+          }
+        });
+      } else {
+        setConfirmDialog({
+          title: 'Drop Table',
+          message: `Are you sure you want to DROP table "${tableName}"? This action cannot be undone and will permanently delete the table and all its data.`,
+          variant: 'danger',
+          action: () => {
+            onQueryExecute?.(`DROP TABLE ${tableName};`);
+            setConfirmDialog(null);
+          }
+        });
+      }
       setContextMenu(null);
     }
   };
@@ -428,13 +496,13 @@ export default function SchemaExplorer({ schema, isLoading, databaseType, onTabl
             className="w-full px-3 py-2 text-left text-sm text-zinc-300 hover:bg-zinc-800 transition flex items-center gap-2"
           >
             <Columns className="w-3.5 h-3.5 text-sky-400" />
-            Table Structure
+            {databaseType === 'mongodb' ? 'Collection Structure' : 'Table Structure'}
           </button>
           
           <div className="my-1 border-t border-zinc-800/50"></div>
           
           <div className="px-2 py-1 text-xs text-zinc-600 uppercase tracking-wide">
-            Generate SQL
+            {databaseType === 'mongodb' ? 'Generate MongoDB Query' : databaseType === 'redis' ? 'Generate Redis Command' : 'Generate SQL'}
           </div>
           
           <button
@@ -442,28 +510,28 @@ export default function SchemaExplorer({ schema, isLoading, databaseType, onTabl
             className="w-full px-3 py-2 text-left text-sm text-zinc-300 hover:bg-zinc-800 transition flex items-center gap-2"
           >
             <FileText className="w-3.5 h-3.5 text-violet-400" />
-            SELECT Statement
+            {databaseType === 'mongodb' ? 'FIND Query' : 'SELECT Statement'}
           </button>
           <button
             onClick={handleGenerateInsert}
             className="w-full px-3 py-2 text-left text-sm text-zinc-300 hover:bg-zinc-800 transition flex items-center gap-2"
           >
             <Plus className="w-3.5 h-3.5 text-emerald-400" />
-            INSERT Statement
+            {databaseType === 'mongodb' ? 'INSERT Document' : 'INSERT Statement'}
           </button>
           <button
             onClick={handleGenerateUpdate}
             className="w-full px-3 py-2 text-left text-sm text-zinc-300 hover:bg-zinc-800 transition flex items-center gap-2"
           >
             <Edit className="w-3.5 h-3.5 text-amber-400" />
-            UPDATE Statement
+            {databaseType === 'mongodb' ? 'UPDATE Document' : 'UPDATE Statement'}
           </button>
           <button
             onClick={handleGenerateDelete}
             className="w-full px-3 py-2 text-left text-sm text-zinc-300 hover:bg-zinc-800 transition flex items-center gap-2"
           >
             <Trash2 className="w-3.5 h-3.5 text-rose-400" />
-            DELETE Statement
+            {databaseType === 'mongodb' ? 'DELETE Document' : 'DELETE Statement'}
           </button>
           
           <div className="my-1 border-t border-zinc-800/50"></div>
@@ -473,14 +541,14 @@ export default function SchemaExplorer({ schema, isLoading, databaseType, onTabl
             className="w-full px-3 py-2 text-left text-sm text-amber-400 hover:bg-zinc-800 transition flex items-center gap-2"
           >
             <Copy className="w-3.5 h-3.5" />
-            Truncate Table
+            {databaseType === 'mongodb' ? 'Delete All Documents' : 'Truncate Table'}
           </button>
           <button
             onClick={handleDropTable}
             className="w-full px-3 py-2 text-left text-sm text-rose-400 hover:bg-zinc-800 transition flex items-center gap-2"
           >
             <Trash2 className="w-3.5 h-3.5" />
-            Drop Table
+            {databaseType === 'mongodb' ? 'Drop Collection' : 'Drop Table'}
           </button>
         </div>
       )}

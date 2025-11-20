@@ -1,0 +1,130 @@
+:root {
+  color-scheme: dark;
+  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: #05030a;
+  color: #f6f5ff;
+}
+
+body {
+  margin: 0;
+  padding: 2rem;
+  min-height: 100vh;
+  background: radial-gradient(circle at top, rgba(104, 76, 255, 0.3), transparent 50%), #05030a;
+}
+
+main {
+  max-width: 960px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+header {
+  text-align: center;
+}
+
+.card {
+  background: #0f0b1b;
+  border: 1px solid #211a3d;
+  border-radius: 16px;
+  padding: 1.5rem;
+  box-shadow: 0 20px 70px rgba(17, 0, 36, 0.5);
+}
+
+.card h2 {
+  margin-top: 0;
+}
+
+form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  font-size: 0.9rem;
+  color: #c5c1ff;
+}
+
+input,
+select,
+textarea {
+  background: #1b122f;
+  border: 1px solid #2f2451;
+  border-radius: 10px;
+  padding: 0.65rem 0.75rem;
+  color: #f5f3ff;
+  font-size: 0.95rem;
+}
+
+button {
+  background: linear-gradient(120deg, #7b5dff, #b43bff);
+  border: none;
+  border-radius: 999px;
+  padding: 0.75rem 1.5rem;
+  color: white;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 25px rgba(125, 94, 255, 0.4);
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+textarea {
+  width: 100%;
+  min-height: 180px;
+  resize: vertical;
+}
+
+pre {
+  margin: 1rem 0 0;
+  padding: 1rem;
+  background: #080512;
+  border-radius: 12px;
+  border: 1px solid #1d1430;
+  overflow: auto;
+}
+
+.status {
+  min-height: 1.5rem;
+  margin-top: 1rem;
+  font-size: 0.9rem;
+  color: #8fe9ff;
+}
+
+.hidden {
+  display: none;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.actions button {
+  flex: 1;
+  min-width: 150px;
+}
+
+@media (max-width: 640px) {
+  body {
+    padding: 1rem;
+  }
+  .actions {
+    flex-direction: column;
+  }
+}

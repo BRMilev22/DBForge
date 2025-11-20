@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>DBForge Framework Playground</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>DBForge Framework</h1>
+        <p>Connect to your managed database using a connection string, credentials, or API token.</p>
+      </header>
+
+      <section class="card">
+        <h2>Connection</h2>
+        <form id="connect-form">
+          <label>
+            Connection Mode
+            <select id="connection-type" required>
+              <option value="token">API Token</option>
+              <option value="connectionString">Connection String</option>
+              <option value="credentials">Username &amp; Password</option>
+            </select>
+          </label>
+
+          <div class="mode mode-token">
+            <label>
+              API URL
+              <input type="text" id="api-url" placeholder="http://localhost:8080/api" />
+            </label>
+            <label>
+              API Token
+              <input type="text" id="api-token" placeholder="dfg_live_..." />
+            </label>
+          </div>
+
+          <div class="mode mode-connectionString hidden">
+            <label>
+              Connection String
+              <input type="text" id="connection-string" placeholder="mysql://user:pass@host:3306/db" />
+            </label>
+          </div>
+
+          <div class="mode mode-credentials hidden">
+            <label>
+              Database Type
+              <select id="cred-type">
+                <option value="mysql">MySQL</option>
+                <option value="postgresql">PostgreSQL</option>
+              </select>
+            </label>
+            <label>
+              Host
+              <input type="text" id="cred-host" value="localhost" />
+            </label>
+            <label>
+              Port
+              <input type="number" id="cred-port" placeholder="3306" />
+            </label>
+            <label>
+              Username
+              <input type="text" id="cred-username" />
+            </label>
+            <label>
+              Password
+              <input type="password" id="cred-password" />
+            </label>
+            <label>
+              Database
+              <input type="text" id="cred-database" />
+            </label>
+          </div>
+
+          <button type="submit">Connect</button>
+        </form>
+        <p id="connection-status" class="status"></p>
+      </section>
+
+      <section class="card">
+        <h2>Query Runner</h2>
+        <textarea id="query-input" rows="6" placeholder="SELECT * FROM users LIMIT 5;"></textarea>
+        <div class="actions">
+          <button id="run-query">Run Query</button>
+          <button id="select-users">Quick SELECT</button>
+          <button id="insert-user">Quick INSERT</button>
+          <button id="delete-user">Quick DELETE</button>
+        </div>
+        <pre id="query-result"></pre>
+      </section>
+    </main>
+
+    <script type="module" src="app.js"></script>
+  </body>
+</html>

@@ -241,8 +241,8 @@ function App() {
 
       {/* Sidebar Navigation */}
       <aside className="fixed left-0 top-0 h-screen w-16 border-r border-zinc-800/50 bg-zinc-950/60 backdrop-blur-xl flex flex-col items-center py-6 gap-6 z-40">
-        <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-violet-500 to-fuchsia-500 p-1.5 flex items-center justify-center shadow-lg shadow-violet-500/20">
-          <img src="/dbforge-logo.svg" alt="DBForge" className="w-full h-full object-contain" />
+        <div className="w-10 h-10 rounded-lg bg-gradient-to-br p-1.5 flex items-center justify-center">
+          <img src="/dbforge-logo.png" alt="DBForge" className="w-full h-full object-contain" />
         </div>
 
         <nav className="flex-1 flex flex-col items-center gap-2">

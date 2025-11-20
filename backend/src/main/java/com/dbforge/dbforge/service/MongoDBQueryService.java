@@ -2,6 +2,7 @@ package com.dbforge.dbforge.service;
 
 import com.dbforge.dbforge.dto.QueryRequest;
 import com.dbforge.dbforge.dto.QueryResult;
+import com.dbforge.dbforge.dto.SchemaInfo;
 import com.dbforge.dbforge.model.DatabaseInstance;
 import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoClients;
@@ -9,6 +10,7 @@ import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoDatabase;
 import lombok.extern.slf4j.Slf4j;
 import org.bson.Document;
+import org.bson.types.ObjectId;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
@@ -71,6 +73,12 @@ public class MongoDBQueryService {
         }
     }
 
+    private String preprocessMongoQuery(String query) {
+        // Replace ObjectId("...") with proper BSON ObjectId syntax
+        // Pattern: ObjectId("hexstring") -> {"$oid": "hexstring"}
+        return query.replaceAll("ObjectId\\(\"([a-f0-9]{24})\"\\)", "{\"\$oid\": \"$1\"}");
+    }
+
     private QueryResult executeMongoCommand(MongoDatabase database, String query, Integer limit) {
         long startTime = System.currentTimeMillis();
         
@@ -101,6 +109,8 @@ public class MongoDBQueryService {
                 return executeDeleteQuery(collection, operation, startTime);
             } else if (operation.startsWith("count")) {
                 return executeCountQuery(collection, startTime);
+            } else if (operation.startsWith("drop()")) {
+                return executeDropCollection(collection, collectionName, startTime);
             } else {
                 return QueryResult.builder()
                     .success(false)
@@ -117,6 +127,12 @@ public class MongoDBQueryService {
                 .executionTimeMs(executionTime)
                 .build();
         }
+    }
+
+    private String preprocessMongoQuery(String query) {
+        // Replace ObjectId("...") with proper BSON ObjectId syntax
+        // Pattern: ObjectId("hexstring") -> {"$oid": "hexstring"}
+        return query.replaceAll("ObjectId\\(\"([a-f0-9]{24})\"\\)", "{\"\\$oid\": \"$1\"}");
     }
 
     private QueryResult executeFindQuery(MongoCollection<Document> collection, String operation, Integer limit, long startTime) {
@@ -289,6 +305,10 @@ public class MongoDBQueryService {
             String updateJson = params.substring(splitIndex).trim();
             if (updateJson.startsWith(",")) updateJson = updateJson.substring(1).trim();
             
+            // Preprocess to handle ObjectId() syntax
+            filterJson = preprocessMongoQuery(filterJson);
+            updateJson = preprocessMongoQuery(updateJson);
+            
             Document filter = Document.parse(filterJson);
             Document update = Document.parse(updateJson);
             
@@ -338,6 +358,8 @@ public class MongoDBQueryService {
             }
             
             String filterJson = operation.substring(startIdx + 1, endIdx).trim();
+            // Preprocess to handle ObjectId() syntax
+            filterJson = preprocessMongoQuery(filterJson);
             Document filter = Document.parse(filterJson);
             
             long deletedCount;
@@ -385,6 +407,76 @@ public class MongoDBQueryService {
             .rowCount(1)
             .executionTimeMs(System.currentTimeMillis() - startTime)
             .build();
+    }
+
+    private QueryResult executeDropCollection(MongoCollection<Document> collection, String collectionName, long startTime) {
+        try {
+            collection.drop();
+            
+            return QueryResult.builder()
+                .success(true)
+                .queryType("DROP")
+                .affectedRows(0)
+                .executionTimeMs(System.currentTimeMillis() - startTime)
+                .message("Collection '" + collectionName + "' dropped successfully")
+                .build();
+        } catch (Exception e) {
+            log.error("Drop collection failed: {}", e.getMessage());
+            return QueryResult.builder()
+                .success(false)
+                .error("Drop failed: " + e.getMessage())
+                .executionTimeMs(System.currentTimeMillis() - startTime)
+                .build();
+        }
+    }
+
+    public List<SchemaInfo.TableInfo> getCollectionsWithSchema(DatabaseInstance instance) {
+        String host = "localhost";
+        String connectionString = String.format("mongodb://%s:%s@%s:%d/%s?authSource=admin",
+            instance.getUsername(),
+            instance.getPassword(),
+            host,
+            instance.getPort(),
+            instance.getDatabaseName()
+        );
+
+        try (MongoClient mongoClient = MongoClients.create(connectionString)) {
+            MongoDatabase database = mongoClient.getDatabase(instance.getDatabaseName());
+            List<SchemaInfo.TableInfo> tables = new ArrayList<>();
+            
+            for (String collectionName : database.listCollectionNames()) {
+                MongoCollection<Document> collection = database.getCollection(collectionName);
+                long count = collection.countDocuments();
+                
+                List<SchemaInfo.ColumnInfo> columns = new ArrayList<>();
+                Document sample = collection.find().first();
+                
+                if (sample != null) {
+                    for (String key : sample.keySet()) {
+                        Object value = sample.get(key);
+                        String type = value != null ? value.getClass().getSimpleName() : "Object";
+                        if (value instanceof org.bson.types.ObjectId) type = "ObjectId";
+                        
+                        columns.add(SchemaInfo.ColumnInfo.builder()
+                            .name(key)
+                            .dataType(type)
+                            .build());
+                    }
+                }
+                
+                tables.add(SchemaInfo.TableInfo.builder()
+                    .name(collectionName)
+                    .type("COLLECTION")
+                    .rowCount(count)
+                    .columns(columns)
+                    .indexes(new ArrayList<>())
+                    .build());
+            }
+            return tables;
+        } catch (Exception e) {
+            log.error("Failed to get MongoDB schema: {}", e.getMessage());
+            return new ArrayList<>();
+        }
     }
 
     public List<String> getCollections(DatabaseInstance instance) {

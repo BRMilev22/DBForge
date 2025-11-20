@@ -1,0 +1,15 @@
+{
+  "name": "dbforge-framework",
+  "version": "0.1.0",
+  "description": "Lightweight client framework for interacting with DBForge managed databases via API tokens, connection strings, or credentials.",
+  "type": "module",
+  "main": "src/client.js",
+  "scripts": {
+    "lint": "echo 'No lint configured'",
+    "test": "node --eval \"import('./src/client.js').then(() => console.log('dbforge framework ready'))\""
+  },
+  "dependencies": {
+    "mysql2": "^3.9.7",
+    "pg": "^8.13.1"
+  }
+}
