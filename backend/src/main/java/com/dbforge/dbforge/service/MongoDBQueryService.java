@@ -76,7 +76,7 @@ public class MongoDBQueryService {
     private String preprocessMongoQuery(String query) {
         // Replace ObjectId("...") with proper BSON ObjectId syntax
         // Pattern: ObjectId("hexstring") -> {"$oid": "hexstring"}
-        return query.replaceAll("ObjectId\\(\"([a-f0-9]{24})\"\\)", "{\"\$oid\": \"$1\"}");
+        return query.replaceAll("ObjectId\\\\(\\\"([a-f0-9]{24})\\\"\\\\)", "{\\\"\\\\$oid\\\": \\\"$1\\\"}");
     }
 
     private QueryResult executeMongoCommand(MongoDatabase database, String query, Integer limit) {
@@ -127,12 +127,6 @@ public class MongoDBQueryService {
                 .executionTimeMs(executionTime)
                 .build();
         }
-    }
-
-    private String preprocessMongoQuery(String query) {
-        // Replace ObjectId("...") with proper BSON ObjectId syntax
-        // Pattern: ObjectId("hexstring") -> {"$oid": "hexstring"}
-        return query.replaceAll("ObjectId\\(\"([a-f0-9]{24})\"\\)", "{\"\\$oid\": \"$1\"}");
     }
 
     private QueryResult executeFindQuery(MongoCollection<Document> collection, String operation, Integer limit, long startTime) {

@@ -87,6 +87,9 @@ export default function SchemaExplorer({ schema, isLoading, databaseType, onTabl
     if (contextMenu) {
       if (databaseType === 'mongodb') {
         onQueryGenerate?.(`db.${contextMenu.table.name}.find({})`);
+      } else if (databaseType === 'redis') {
+        // For Redis, table name is a key pattern like "user:*"
+        onQueryGenerate?.(`KEYS ${contextMenu.table.name}`);
       } else {
         const columns = contextMenu.table.columns.map(c => c.name).join(', ');
         onQueryGenerate?.(`SELECT ${columns}\nFROM ${contextMenu.table.name};`);
@@ -115,6 +118,11 @@ export default function SchemaExplorer({ schema, isLoading, databaseType, onTabl
             return `${c.name}: "?"`;
           }).join(', ');
         onQueryGenerate?.(`db.${contextMenu.table.name}.insertOne({${fields}})`);
+      } else if (databaseType === 'redis') {
+        // For Redis, generate a SET command
+        // Extract the prefix from pattern (e.g., "user:*" -> "user:")
+        const prefix = contextMenu.table.name.replace('*', '');
+        onQueryGenerate?.(`SET ${prefix}? "value"`);
       } else {
         const columns = contextMenu.table.columns.map(c => c.name).join(', ');
         // Generate appropriate placeholders based on column type
@@ -162,6 +170,10 @@ export default function SchemaExplorer({ schema, isLoading, databaseType, onTabl
             return `${c.name}: "?"`;
           }).join(', ');
         onQueryGenerate?.(`db.${contextMenu.table.name}.updateOne({_id: ObjectId("?")}, {$set: {${updateFields}}})`);
+      } else if (databaseType === 'redis') {
+        // For Redis, generate a SET command (update is same as insert)
+        const prefix = contextMenu.table.name.replace('*', '');
+        onQueryGenerate?.(`SET ${prefix}? "new_value"`);
       } else {
         const sets = contextMenu.table.columns.filter(c => !c.primaryKey).map(c => {
           const type = c.dataType.toLowerCase();
@@ -200,6 +212,10 @@ export default function SchemaExplorer({ schema, isLoading, databaseType, onTabl
     if (contextMenu) {
       if (databaseType === 'mongodb') {
         onQueryGenerate?.(`db.${contextMenu.table.name}.deleteOne({_id: ObjectId("?")})`);
+      } else if (databaseType === 'redis') {
+        // For Redis, generate a DEL command
+        const prefix = contextMenu.table.name.replace('*', '');
+        onQueryGenerate?.(`DEL ${prefix}?`);
       } else {
         const pkCol = contextMenu.table.columns.find(c => c.primaryKey)?.name || 'id';
         onQueryGenerate?.(`DELETE FROM ${contextMenu.table.name}\nWHERE ${pkCol} = ?;`);
@@ -218,6 +234,17 @@ export default function SchemaExplorer({ schema, isLoading, databaseType, onTabl
           variant: 'warning',
           action: () => {
             onQueryExecute?.(`db.${tableName}.deleteMany({})`);
+            setConfirmDialog(null);
+          }
+        });
+      } else if (databaseType === 'redis') {
+        setConfirmDialog({
+          title: 'Delete All Keys',
+          message: `Are you sure you want to delete all keys matching pattern "${tableName}"? This action cannot be undone.`,
+          variant: 'warning',
+          action: () => {
+            // Redis doesn't have a direct delete by pattern, user needs to manually delete
+            onQueryGenerate?.(`# Delete all keys matching ${tableName}\n# You'll need to delete them individually or use:\n# redis-cli --scan --pattern "${tableName}" | xargs redis-cli DEL`);
             setConfirmDialog(null);
           }
         });
@@ -246,6 +273,17 @@ export default function SchemaExplorer({ schema, isLoading, databaseType, onTabl
           variant: 'danger',
           action: () => {
             onQueryExecute?.(`db.${tableName}.drop()`);
+            setConfirmDialog(null);
+          }
+        });
+      } else if (databaseType === 'redis') {
+        // Redis doesn't have collections/tables to drop - just show info
+        setConfirmDialog({
+          title: 'Delete Keys',
+          message: `Redis doesn't have a "drop" concept. Would you like to see how to delete all keys matching "${tableName}"?`,
+          variant: 'warning',
+          action: () => {
+            onQueryGenerate?.(`# Redis doesn't support DROP\n# To delete all keys matching ${tableName}:\n# Use KEYS ${tableName} then DEL each key`);
             setConfirmDialog(null);
           }
         });

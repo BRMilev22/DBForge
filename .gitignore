@@ -5,6 +5,8 @@
 .env
 .env.local
 
+node_modules
+
 # Backend (Java/Maven)
 backend/target/
 backend/.mvn/
