@@ -58,6 +58,9 @@ public class DatabaseInstance {
     
     @Column(name = "storage_limit")
     private String storageLimit = "1g";
+
+    @Column(name = "api_token", unique = true)
+    private String apiToken;
     
     @Enumerated(EnumType.STRING)
     private InstanceStatus status = InstanceStatus.CREATING;

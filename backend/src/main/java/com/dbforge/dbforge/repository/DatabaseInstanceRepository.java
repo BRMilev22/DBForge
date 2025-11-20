@@ -15,4 +15,6 @@ public interface DatabaseInstanceRepository extends JpaRepository<DatabaseInstan
     
     @Query("SELECT d.port FROM DatabaseInstance d WHERE d.databaseType.id = ?1")
     List<Integer> findAllocatedPortsByDatabaseTypeId(Long databaseTypeId);
+
+    boolean existsByApiToken(String apiToken);
 }

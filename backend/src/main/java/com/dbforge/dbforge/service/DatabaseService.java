@@ -30,6 +30,7 @@ public class DatabaseService {
     private final DatabaseTypeRepository typeRepository;
     private final DatabaseVersionRepository versionRepository;
     private final DockerService dockerService;
+    private final ApiTokenService apiTokenService;
     
     @Value("${port.postgres.start:5432}")
     private int postgresStart;
@@ -100,6 +101,22 @@ public class DatabaseService {
         instance.setDatabaseName(databaseName);
         instance.setUsername(username);
         instance.setPassword(password);
+        // generate an API token for this database instance (length between 30-40 chars)
+        try {
+            int tokenLength = 30 + new SecureRandom().nextInt(11); // 30..40 inclusive
+            ApiTokenService.TokenGenerationResult tgr = apiTokenService.createApiTokenWithLength(
+                    userId,
+                    String.format("db-%d-%s", userId, databaseName),
+                    null,
+                    null,
+                    tokenLength
+            );
+            instance.setApiToken(tgr.getRawToken());
+        } catch (Exception e) {
+            log.warn("Failed to create api token via ApiTokenService, falling back to local token: {}", e.getMessage());
+            String apiToken = generateUniqueApiToken(35);
+            instance.setApiToken(apiToken);
+        }
         instance.setStatus(DatabaseInstance.InstanceStatus.CREATING);
         
         instance = instanceRepository.save(instance);
@@ -131,6 +148,26 @@ public class DatabaseService {
         }
         
         return instanceRepository.save(instance);
+    }
+
+    private String generateUniqueApiToken(int length) {
+        String chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+        SecureRandom random = new SecureRandom();
+        String token;
+        int attempts = 0;
+        do {
+            StringBuilder sb = new StringBuilder(length);
+            for (int i = 0; i < length; i++) {
+                sb.append(chars.charAt(random.nextInt(chars.length())));
+            }
+            token = sb.toString();
+            attempts++;
+            if (attempts > 10) {
+                // fallback: include timestamp to reduce collisions
+                token = token + System.currentTimeMillis();
+            }
+        } while (instanceRepository.existsByApiToken(token));
+        return token;
     }
     
     private void initializeDefaultSchema(DatabaseInstance instance) {
@@ -229,6 +266,29 @@ public class DatabaseService {
             instance.setStartedAt(LocalDateTime.now());
             instanceRepository.save(instance);
         }
+    }
+
+    @Transactional
+    public String generateApiTokenForInstance(Long id, Long userId) {
+        DatabaseInstance instance = getDatabaseById(id);
+        if (!instance.getUserId().equals(userId)) {
+            throw new RuntimeException("Unauthorized");
+        }
+
+        // generate token with random length between 30 and 40
+        int tokenLength = 30 + new SecureRandom().nextInt(11);
+        ApiTokenService.TokenGenerationResult tgr = apiTokenService.createApiTokenWithLength(
+                userId,
+                String.format("db-%d-%s", userId, instance.getDatabaseName()),
+                null,
+                null,
+                tokenLength
+        );
+
+        String token = tgr.getRawToken();
+        instance.setApiToken(token);
+        instanceRepository.save(instance);
+        return token;
     }
     
     public List<DatabaseType> getAvailableDatabaseTypes() {

@@ -35,4 +35,9 @@ public interface ApiTokenRepository extends JpaRepository<ApiToken, Long> {
      * Find all expired tokens (for cleanup operations)
      */
     List<ApiToken> findByExpiresAtBeforeAndIsActiveTrue(LocalDateTime expiresAt);
+
+    /**
+     * Find all active tokens across all users
+     */
+    List<ApiToken> findByIsActiveTrue();
 }

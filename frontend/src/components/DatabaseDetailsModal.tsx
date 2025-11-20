@@ -1,5 +1,5 @@
 import { X, Database, Play, Square, Trash2, Copy, Check, Server, Key, User, Link, Calendar, Activity, HardDrive } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import type { DatabaseInstance } from '../types/database';
 
 interface DatabaseDetailsModalProps {
@@ -21,7 +21,6 @@ export default function DatabaseDetailsModal({
 }: DatabaseDetailsModalProps) {
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [apiToken, setApiToken] = useState<string | null>(null);
 
   if (!isOpen) return null;
 
@@ -35,14 +34,7 @@ export default function DatabaseDetailsModal({
     }
   };
 
-  useEffect(() => {
-    try {
-      const t = localStorage.getItem('auth_token');
-      setApiToken(t);
-    } catch (err) {
-      // ignore
-    }
-  }, []);
+  // Use the instance-specific API token provided by the backend (database.apiToken)
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -365,11 +357,47 @@ export default function DatabaseDetailsModal({
                 <div className="flex-1">
                   <label className="text-[11px] text-zinc-500 mb-1 block">API Token (used for API requests)</label>
                   <div className="flex items-center gap-2">
-                    <code className="flex-1 px-3 py-2 rounded-lg bg-zinc-950 border border-zinc-800 text-zinc-300 font-mono text-[11px] truncate">
-                      {apiToken ?? 'No API token saved. Add one in Quick Actions.'}
-                    </code>
-                    <button
-                      onClick={() => apiToken && copyToClipboard(apiToken, 'api-token')}
+                    {
+                      database.apiToken ? (
+                        (() => {
+                          let short = database.apiToken as string;
+                          if ((database.apiToken as string).length > 35) {
+                            const start = (database.apiToken as string).substring(0, 17);
+                            const end = (database.apiToken as string).substring((database.apiToken as string).length - 17);
+                            short = `${start}…${end}`;
+                          }
+                          return (
+                            <code title={database.apiToken} className="flex-1 px-3 py-2 rounded-lg bg-zinc-950 border border-zinc-800 text-zinc-300 font-mono text-[11px] truncate">
+                              {short}
+                            </code>
+                          );
+                        })()
+                      ) : (
+                          <div className="flex items-center gap-2">
+                            <code className="flex-1 px-3 py-2 rounded-lg bg-zinc-950 border border-zinc-800 text-zinc-300 font-mono text-[11px] truncate">
+                              No API token available for this database.
+                            </code>
+                            <button
+                              onClick={async (e) => {
+                                e.stopPropagation();
+                                try {
+                                  const token = await (await import('../services/api')).databaseApi.generateApiToken(database.id);
+                                  // update the local object so UI shows it without refetch
+                                  (database as any).apiToken = token;
+                                  copyToClipboard(token, 'api-token');
+                                } catch (err) {
+                                  console.error('Failed to generate API token:', err);
+                                }
+                              }}
+                              className="px-3 py-1 rounded bg-violet-500 text-white text-xs hover:bg-violet-400 transition"
+                            >
+                              Generate
+                            </button>
+                          </div>
+                        )
+                      }
+                      <button
+                        onClick={() => database.apiToken && copyToClipboard(database.apiToken as string, 'api-token')}
                       className="w-8 h-8 rounded-lg bg-zinc-800 hover:bg-zinc-700 flex items-center justify-center transition"
                       title="Copy API token"
                     >

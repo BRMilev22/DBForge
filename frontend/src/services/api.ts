@@ -84,6 +84,12 @@ export const databaseApi = {
     await api.delete(`/databases/${id}`);
   },
 
+  // Generate API token for a database instance
+  generateApiToken: async (id: number): Promise<string> => {
+    const response = await api.post(`/databases/${id}/token`);
+    return response.data.apiToken;
+  },
+
   // Execute query on database
   executeQuery: async (id: number, query: string, limit?: number, timeout?: number) => {
     const response = await api.post(`/databases/${id}/query`, {

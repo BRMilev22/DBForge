@@ -21,6 +21,7 @@ export interface DatabaseInstance {
   databaseType: string;
   status: 'RUNNING' | 'STOPPED' | 'CREATING' | 'ERROR';
   connectionInfo: ConnectionInfo;
+  apiToken?: string;
   containerId?: string;
   createdAt: string;
   startedAt?: string;

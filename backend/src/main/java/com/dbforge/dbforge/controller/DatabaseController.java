@@ -136,4 +136,18 @@ public class DatabaseController {
             return ResponseEntity.status(500).body("Failed to delete database");
         }
     }
+
+    @PostMapping("/{id}/token")
+    public ResponseEntity<?> generateApiToken(
+            @PathVariable Long id,
+            Authentication authentication) {
+        try {
+            Long userId = getUserId(authentication);
+            String token = databaseService.generateApiTokenForInstance(id, userId);
+            return ResponseEntity.ok(Map.of("apiToken", token));
+        } catch (Exception e) {
+            log.error("Failed to generate API token", e);
+            return ResponseEntity.status(500).body(Map.of("error", e.getMessage()));
+        }
+    }
 }

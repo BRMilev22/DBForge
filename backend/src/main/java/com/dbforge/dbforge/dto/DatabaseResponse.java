@@ -13,6 +13,7 @@ public class DatabaseResponse {
     private String instanceName;
     private String databaseType;
     private String status;
+    private String apiToken;
     private ConnectionInfo connectionInfo;
     
     @Data
@@ -43,6 +44,7 @@ public class DatabaseResponse {
         connInfo.setConnectionString(buildConnectionString(instance));
         
         response.setConnectionInfo(connInfo);
+        response.setApiToken(instance.getApiToken());
         return response;
     }
     

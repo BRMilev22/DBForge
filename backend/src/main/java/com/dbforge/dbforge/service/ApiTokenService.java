@@ -71,6 +71,53 @@ public class ApiTokenService {
                 .apiToken(apiToken)
                 .build();
     }
+
+    /**
+     * Create an API token where the total token length (including prefix) is approximately totalLength characters.
+     * Uses an alphanumeric random generator for the suffix to control final length.
+     */
+    @Transactional
+    public TokenGenerationResult createApiTokenWithLength(
+            Long userId,
+            String tokenName,
+            String scopes,
+            Integer expirationDays,
+            int totalLength) {
+
+        if (totalLength <= TOKEN_PREFIX.length() + 8) {
+            throw new IllegalArgumentException("totalLength too small");
+        }
+
+        // random part length excluding prefix
+        int randomPartLength = Math.max(8, totalLength - TOKEN_PREFIX.length());
+
+        String rawToken = generateAlphanumericToken(randomPartLength);
+        rawToken = TOKEN_PREFIX + rawToken;
+
+        String tokenHash = hashToken(rawToken);
+
+        LocalDateTime expiresAt = null;
+        if (expirationDays != null && expirationDays > 0) {
+            expiresAt = LocalDateTime.now().plusDays(expirationDays);
+        }
+
+        ApiToken apiToken = ApiToken.builder()
+                .userId(userId)
+                .tokenName(tokenName)
+                .tokenHash(tokenHash)
+                .scopes(scopes)
+                .expiresAt(expiresAt)
+                .isActive(true)
+                .build();
+
+        apiToken = apiTokenRepository.save(apiToken);
+
+        return TokenGenerationResult.builder()
+                .tokenId(apiToken.getId())
+                .rawToken(rawToken)
+                .apiToken(apiToken)
+                .build();
+    }
     
     /**
      * Validate an API token and return user ID if valid
@@ -84,33 +131,30 @@ public class ApiTokenService {
         if (rawToken == null || rawToken.isEmpty()) {
             return Optional.empty();
         }
-        
+
         // Check if token has correct prefix
         if (!rawToken.startsWith(TOKEN_PREFIX)) {
             return Optional.empty();
         }
-        
-        String tokenHash = hashToken(rawToken);
-        
-        Optional<ApiToken> tokenOpt = apiTokenRepository.findByTokenHashAndIsActiveTrue(tokenHash);
-        
-        if (tokenOpt.isPresent()) {
-            ApiToken token = tokenOpt.get();
-            
-            // Check if token has expired
-            if (!token.isValid()) {
-                log.warn("Attempt to use expired or inactive token: {}", token.getTokenName());
-                return Optional.empty();
+
+        // Fetch all active tokens and check matches using password encoder
+        List<ApiToken> activeTokens = apiTokenRepository.findByIsActiveTrue();
+
+        for (ApiToken token : activeTokens) {
+            if (token.isValid()) {
+                try {
+                    if (passwordEncoder.matches(rawToken, token.getTokenHash())) {
+                        token.setLastUsedAt(LocalDateTime.now());
+                        apiTokenRepository.save(token);
+                        log.debug("API token validated for user: {}", token.getUserId());
+                        return Optional.of(token.getUserId());
+                    }
+                } catch (Exception e) {
+                    // ignore and continue
+                }
             }
-            
-            // Update last used time
-            token.setLastUsedAt(LocalDateTime.now());
-            apiTokenRepository.save(token);
-            
-            log.debug("API token validated for user: {}", token.getUserId());
-            return Optional.of(token.getUserId());
         }
-        
+
         return Optional.empty();
     }
     
@@ -173,6 +217,16 @@ public class ApiTokenService {
         new SecureRandom().nextBytes(randomBytes);
         String encodedToken = Base64.getUrlEncoder().withoutPadding().encodeToString(randomBytes);
         return TOKEN_PREFIX + encodedToken;
+    }
+
+    private String generateAlphanumericToken(int length) {
+        String chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+        SecureRandom random = new SecureRandom();
+        StringBuilder sb = new StringBuilder(length);
+        for (int i = 0; i < length; i++) {
+            sb.append(chars.charAt(random.nextInt(chars.length())));
+        }
+        return sb.toString();
     }
     
     /**
