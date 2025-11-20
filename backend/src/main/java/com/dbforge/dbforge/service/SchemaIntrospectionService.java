@@ -17,6 +17,7 @@ public class SchemaIntrospectionService {
     
     private final DatabaseInstanceRepository databaseInstanceRepository;
     private final MongoDBQueryService mongoDBQueryService;
+    private final RedisQueryService redisQueryService;
     
     public SchemaInfo getSchema(Long instanceId) {
         DatabaseInstance instance = databaseInstanceRepository.findById(instanceId)
@@ -192,12 +193,39 @@ public class SchemaIntrospectionService {
     }
     
     private SchemaInfo getRedisSchema(DatabaseInstance instance) {
-        // Redis doesn't have a traditional schema
-        // Return empty schema - keys will be browsed via KEYS command
-        return SchemaInfo.builder()
-            .databaseName("Redis Key-Value Store")
-            .tables(new ArrayList<>())
-            .build();
+        try {
+            List<String> keys = redisQueryService.getKeys(instance);
+            List<SchemaInfo.TableInfo> tables = new ArrayList<>();
+            
+            // Group keys by pattern (e.g., "user:1:name" -> "user")
+            Map<String, Integer> keyPrefixes = new LinkedHashMap<>();
+            for (String key : keys) {
+                String prefix = key.contains(":") ? key.substring(0, key.indexOf(":")) : key;
+                keyPrefixes.put(prefix, keyPrefixes.getOrDefault(prefix, 0) + 1);
+            }
+            
+            // Create a "table" for each key prefix
+            for (Map.Entry<String, Integer> entry : keyPrefixes.entrySet()) {
+                tables.add(SchemaInfo.TableInfo.builder()
+                    .name(entry.getKey() + ":*")
+                    .type("KEY PATTERN")
+                    .rowCount(entry.getValue().longValue())
+                    .columns(new ArrayList<>())
+                    .indexes(new ArrayList<>())
+                    .build());
+            }
+            
+            return SchemaInfo.builder()
+                .databaseName("Redis Key-Value Store")
+                .tables(tables)
+                .build();
+        } catch (Exception e) {
+            log.error("Failed to get Redis keys: {}", e.getMessage());
+            return SchemaInfo.builder()
+                .databaseName("Redis Key-Value Store")
+                .tables(new ArrayList<>())
+                .build();
+        }
     }
     
     private SchemaInfo getMongoDBSchema(DatabaseInstance instance) {

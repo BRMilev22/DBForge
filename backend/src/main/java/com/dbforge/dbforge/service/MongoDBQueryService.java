@@ -23,7 +23,8 @@ public class MongoDBQueryService {
         // Use localhost since backend runs on same server as Docker containers
         String host = "localhost";
         
-        String connectionString = String.format("mongodb://%s:%s@%s:%d/%s",
+        // MongoDB root user is created in 'admin' database, so authenticate there
+        String connectionString = String.format("mongodb://%s:%s@%s:%d/%s?authSource=admin",
             instance.getUsername(),
             instance.getPassword(),
             host,
@@ -34,16 +35,28 @@ public class MongoDBQueryService {
         try (MongoClient mongoClient = MongoClients.create(connectionString)) {
             MongoDatabase database = mongoClient.getDatabase(instance.getDatabaseName());
             
-            // Parse the query
+            // Parse the query - remove comments and whitespace
             String query = request.getQuery().trim();
             
+            // Remove single-line comments and normalize
+            String[] lines = query.split("\\n");
+            StringBuilder cleaned = new StringBuilder();
+            for (String line : lines) {
+                String trimmedLine = line.trim();
+                // Skip empty lines and comment lines
+                if (!trimmedLine.isEmpty() && !trimmedLine.startsWith("//") && !trimmedLine.startsWith("#")) {
+                    cleaned.append(trimmedLine).append(" ");
+                }
+            }
+            String normalizedQuery = cleaned.toString().trim();
+            
             // Simple query parsing - real implementation would need a proper parser
-            if (query.startsWith("db.") || query.startsWith("use ")) {
-                return executeMongoCommand(database, query, request.getLimit());
+            if (normalizedQuery.startsWith("db.") || normalizedQuery.startsWith("use ")) {
+                return executeMongoCommand(database, normalizedQuery, request.getLimit());
             } else {
                 return QueryResult.builder()
                     .success(false)
-                    .error("Query must start with 'db.' (e.g., db.users.find({}))")
+                    .error("Query must start with 'db.' (e.g., db.users.insertOne({name: 'John'}))")
                     .build();
             }
             
@@ -150,6 +163,8 @@ public class MongoDBQueryService {
             rows.add(row);
         }
         
+        log.info("MongoDB find query returned {} documents with columns: {}", rows.size(), columns);
+        
         return QueryResult.builder()
             .success(true)
             .queryType("FIND")
@@ -157,38 +172,203 @@ public class MongoDBQueryService {
             .rows(rows)
             .rowCount(rows.size())
             .executionTimeMs(System.currentTimeMillis() - startTime)
+            .message(rows.size() + " document(s) found")
             .build();
     }
 
     private QueryResult executeInsertQuery(MongoCollection<Document> collection, String operation, long startTime) {
-        // Simplified - real implementation would parse the insert document
-        return QueryResult.builder()
-            .success(true)
-            .queryType("INSERT")
-            .affectedRows(1)
-            .executionTimeMs(System.currentTimeMillis() - startTime)
-            .message("Insert operation requires proper document parsing")
-            .build();
+        try {
+            // Parse the document from insertOne({...}) or insertMany([{...}])
+            int startIdx = operation.indexOf('(');
+            int endIdx = operation.lastIndexOf(')');
+            
+            if (startIdx == -1 || endIdx == -1) {
+                return QueryResult.builder()
+                    .success(false)
+                    .error("Invalid insert syntax")
+                    .executionTimeMs(System.currentTimeMillis() - startTime)
+                    .build();
+            }
+            
+            String jsonContent = operation.substring(startIdx + 1, endIdx).trim();
+            
+            if (operation.startsWith("insertOne")) {
+                // Parse single document
+                Document doc = Document.parse(jsonContent);
+                collection.insertOne(doc);
+                
+                return QueryResult.builder()
+                    .success(true)
+                    .queryType("INSERT")
+                    .affectedRows(1)
+                    .executionTimeMs(System.currentTimeMillis() - startTime)
+                    .message("Document inserted successfully")
+                    .build();
+                    
+            } else if (operation.startsWith("insertMany")) {
+                // Parse array of documents
+                // Remove outer brackets if present
+                if (jsonContent.startsWith("[") && jsonContent.endsWith("]")) {
+                    jsonContent = jsonContent.substring(1, jsonContent.length() - 1);
+                }
+                
+                // Split by document boundaries (simplified - assumes well-formed JSON)
+                List<Document> documents = new ArrayList<>();
+                String[] docStrings = jsonContent.split("(?<=\\}),\\s*(?=\\{)");
+                for (String docStr : docStrings) {
+                    documents.add(Document.parse(docStr.trim()));
+                }
+                
+                collection.insertMany(documents);
+                
+                return QueryResult.builder()
+                    .success(true)
+                    .queryType("INSERT")
+                    .affectedRows(documents.size())
+                    .executionTimeMs(System.currentTimeMillis() - startTime)
+                    .message(documents.size() + " document(s) inserted successfully")
+                    .build();
+            }
+            
+            return QueryResult.builder()
+                .success(false)
+                .error("Unknown insert operation")
+                .executionTimeMs(System.currentTimeMillis() - startTime)
+                .build();
+                
+        } catch (Exception e) {
+            log.error("Insert operation failed: {}", e.getMessage());
+            return QueryResult.builder()
+                .success(false)
+                .error("Insert failed: " + e.getMessage())
+                .executionTimeMs(System.currentTimeMillis() - startTime)
+                .build();
+        }
     }
 
     private QueryResult executeUpdateQuery(MongoCollection<Document> collection, String operation, long startTime) {
-        return QueryResult.builder()
-            .success(true)
-            .queryType("UPDATE")
-            .affectedRows(0)
-            .executionTimeMs(System.currentTimeMillis() - startTime)
-            .message("Update operation requires proper query parsing")
-            .build();
+        try {
+            // Parse updateOne({filter}, {update}) or updateMany({filter}, {update})
+            int startIdx = operation.indexOf('(');
+            int endIdx = operation.lastIndexOf(')');
+            
+            if (startIdx == -1 || endIdx == -1) {
+                return QueryResult.builder()
+                    .success(false)
+                    .error("Invalid update syntax")
+                    .executionTimeMs(System.currentTimeMillis() - startTime)
+                    .build();
+            }
+            
+            String params = operation.substring(startIdx + 1, endIdx).trim();
+            
+            // Split filter and update - find the boundary between two JSON objects
+            int braceCount = 0;
+            int splitIndex = -1;
+            for (int i = 0; i < params.length(); i++) {
+                char c = params.charAt(i);
+                if (c == '{') braceCount++;
+                else if (c == '}') {
+                    braceCount--;
+                    if (braceCount == 0 && i < params.length() - 1) {
+                        splitIndex = i + 1;
+                        break;
+                    }
+                }
+            }
+            
+            if (splitIndex == -1) {
+                return QueryResult.builder()
+                    .success(false)
+                    .error("Invalid update syntax: expected {filter}, {update}")
+                    .executionTimeMs(System.currentTimeMillis() - startTime)
+                    .build();
+            }
+            
+            String filterJson = params.substring(0, splitIndex).trim();
+            String updateJson = params.substring(splitIndex).trim();
+            if (updateJson.startsWith(",")) updateJson = updateJson.substring(1).trim();
+            
+            Document filter = Document.parse(filterJson);
+            Document update = Document.parse(updateJson);
+            
+            long modifiedCount;
+            if (operation.startsWith("updateOne")) {
+                modifiedCount = collection.updateOne(filter, update).getModifiedCount();
+            } else if (operation.startsWith("updateMany")) {
+                modifiedCount = collection.updateMany(filter, update).getModifiedCount();
+            } else {
+                return QueryResult.builder()
+                    .success(false)
+                    .error("Unknown update operation")
+                    .executionTimeMs(System.currentTimeMillis() - startTime)
+                    .build();
+            }
+            
+            return QueryResult.builder()
+                .success(true)
+                .queryType("UPDATE")
+                .affectedRows((int) modifiedCount)
+                .executionTimeMs(System.currentTimeMillis() - startTime)
+                .message(modifiedCount + " document(s) updated successfully")
+                .build();
+                
+        } catch (Exception e) {
+            log.error("Update operation failed: {}", e.getMessage());
+            return QueryResult.builder()
+                .success(false)
+                .error("Update failed: " + e.getMessage())
+                .executionTimeMs(System.currentTimeMillis() - startTime)
+                .build();
+        }
     }
 
     private QueryResult executeDeleteQuery(MongoCollection<Document> collection, String operation, long startTime) {
-        return QueryResult.builder()
-            .success(true)
-            .queryType("DELETE")
-            .affectedRows(0)
-            .executionTimeMs(System.currentTimeMillis() - startTime)
-            .message("Delete operation requires proper query parsing")
-            .build();
+        try {
+            // Parse deleteOne({filter}) or deleteMany({filter})
+            int startIdx = operation.indexOf('(');
+            int endIdx = operation.lastIndexOf(')');
+            
+            if (startIdx == -1 || endIdx == -1) {
+                return QueryResult.builder()
+                    .success(false)
+                    .error("Invalid delete syntax")
+                    .executionTimeMs(System.currentTimeMillis() - startTime)
+                    .build();
+            }
+            
+            String filterJson = operation.substring(startIdx + 1, endIdx).trim();
+            Document filter = Document.parse(filterJson);
+            
+            long deletedCount;
+            if (operation.startsWith("deleteOne")) {
+                deletedCount = collection.deleteOne(filter).getDeletedCount();
+            } else if (operation.startsWith("deleteMany")) {
+                deletedCount = collection.deleteMany(filter).getDeletedCount();
+            } else {
+                return QueryResult.builder()
+                    .success(false)
+                    .error("Unknown delete operation")
+                    .executionTimeMs(System.currentTimeMillis() - startTime)
+                    .build();
+            }
+            
+            return QueryResult.builder()
+                .success(true)
+                .queryType("DELETE")
+                .affectedRows((int) deletedCount)
+                .executionTimeMs(System.currentTimeMillis() - startTime)
+                .message(deletedCount + " document(s) deleted successfully")
+                .build();
+                
+        } catch (Exception e) {
+            log.error("Delete operation failed: {}", e.getMessage());
+            return QueryResult.builder()
+                .success(false)
+                .error("Delete failed: " + e.getMessage())
+                .executionTimeMs(System.currentTimeMillis() - startTime)
+                .build();
+        }
     }
 
     private QueryResult executeCountQuery(MongoCollection<Document> collection, long startTime) {
@@ -211,7 +391,8 @@ public class MongoDBQueryService {
         // Use localhost since backend runs on same server as Docker containers
         String host = "localhost";
         
-        String connectionString = String.format("mongodb://%s:%s@%s:%d/%s",
+        // MongoDB root user is created in 'admin' database, so authenticate there
+        String connectionString = String.format("mongodb://%s:%s@%s:%d/%s?authSource=admin",
             instance.getUsername(),
             instance.getPassword(),
             host,

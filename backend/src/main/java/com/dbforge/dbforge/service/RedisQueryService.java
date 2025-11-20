@@ -27,8 +27,113 @@ public class RedisQueryService {
         try (JedisPool pool = new JedisPool(poolConfig, host, instance.getPort(), 2000, instance.getPassword());
              Jedis jedis = pool.getResource()) {
             
-            String command = request.getQuery().trim();
-            String[] parts = command.split("\\s+");
+            // Parse the query - remove comments and extract valid commands
+            String query = request.getQuery().trim();
+            
+            // Split by newlines and filter out comments
+            String[] lines = query.split("\\n");
+            List<String> commands = new ArrayList<>();
+            for (String line : lines) {
+                String trimmedLine = line.trim();
+                // Skip empty lines and comment lines
+                if (!trimmedLine.isEmpty() && !trimmedLine.startsWith("#")) {
+                    commands.add(trimmedLine);
+                }
+            }
+            
+            if (commands.isEmpty()) {
+                return QueryResult.builder()
+                    .success(false)
+                    .error("No valid Redis command found (only comments)")
+                    .executionTimeMs(System.currentTimeMillis() - startTime)
+                    .build();
+            }
+            
+            // If multiple commands, execute them all and return summary
+            if (commands.size() > 1) {
+                int successCount = 0;
+                int errorCount = 0;
+                String lastError = null;
+                
+                for (String cmd : commands) {
+                    try {
+                        QueryResult result = executeSingleCommand(jedis, cmd, startTime);
+                        if (result.getSuccess() != null && result.getSuccess()) {
+                            successCount++;
+                        } else {
+                            errorCount++;
+                            lastError = result.getError();
+                        }
+                    } catch (Exception e) {
+                        errorCount++;
+                        lastError = e.getMessage();
+                    }
+                }
+                
+                if (errorCount > 0) {
+                    return QueryResult.builder()
+                        .success(false)
+                        .error(String.format("Executed %d commands: %d succeeded, %d failed. Last error: %s", 
+                            commands.size(), successCount, errorCount, lastError))
+                        .executionTimeMs(System.currentTimeMillis() - startTime)
+                        .build();
+                }
+                
+                return QueryResult.builder()
+                    .success(true)
+                    .queryType("SET")
+                    .message(String.format("Successfully executed %d commands", successCount))
+                    .executionTimeMs(System.currentTimeMillis() - startTime)
+                    .build();
+            }
+            
+            // Single command
+            return executeSingleCommand(jedis, commands.get(0), startTime);
+            
+        } catch (Exception e) {
+            log.error("Redis command execution error: {}", e.getMessage());
+            long executionTime = System.currentTimeMillis() - startTime;
+            return QueryResult.builder()
+                .success(false)
+                .error(e.getMessage())
+                .executionTimeMs(executionTime)
+                .build();
+        }
+    }
+    
+    private String[] parseCommand(String command) {
+        List<String> parts = new ArrayList<>();
+        StringBuilder current = new StringBuilder();
+        boolean inQuotes = false;
+        
+        log.debug("Parsing command: [{}]", command);
+        
+        for (int i = 0; i < command.length(); i++) {
+            char c = command.charAt(i);
+            
+            if (c == '"') {
+                inQuotes = !inQuotes;
+            } else if (Character.isWhitespace(c) && !inQuotes) {
+                if (current.length() > 0) {
+                    parts.add(current.toString());
+                    current = new StringBuilder();
+                }
+            } else {
+                current.append(c);
+            }
+        }
+        
+        if (current.length() > 0) {
+            parts.add(current.toString());
+        }
+        
+        log.debug("Parsed into {} parts: {}", parts.size(), parts);
+        
+        return parts.toArray(new String[0]);
+    }
+    
+    private QueryResult executeSingleCommand(Jedis jedis, String command, long startTime) {
+        String[] parts = parseCommand(command);
             
             if (parts.length == 0) {
                 return QueryResult.builder()
@@ -69,16 +174,6 @@ public class RedisQueryService {
                     .executionTimeMs(System.currentTimeMillis() - startTime)
                     .build();
             };
-            
-        } catch (Exception e) {
-            log.error("Redis command execution error: {}", e.getMessage());
-            long executionTime = System.currentTimeMillis() - startTime;
-            return QueryResult.builder()
-                .success(false)
-                .error(e.getMessage())
-                .executionTimeMs(executionTime)
-                .build();
-        }
     }
 
     private QueryResult handleGet(Jedis jedis, String[] parts, long startTime) {
@@ -103,7 +198,12 @@ public class RedisQueryService {
             return buildError("SET requires key and value", startTime);
         }
         
-        String result = jedis.set(parts[1], parts[2]);
+        // Join all parts after the key as the value (in case it wasn't quoted)
+        String value = parts.length > 3 
+            ? String.join(" ", Arrays.copyOfRange(parts, 2, parts.length))
+            : parts[2];
+        
+        String result = jedis.set(parts[1], value);
         
         return QueryResult.builder()
             .success(true)
@@ -155,9 +255,33 @@ public class RedisQueryService {
         for (String key : keys) {
             String type = jedis.type(key);
             Long ttl = jedis.ttl(key);
+            
+            // Get value based on type
+            String value;
+            switch (type) {
+                case "string":
+                    value = jedis.get(key);
+                    break;
+                case "list":
+                    value = jedis.lrange(key, 0, -1).toString();
+                    break;
+                case "set":
+                    value = jedis.smembers(key).toString();
+                    break;
+                case "hash":
+                    value = jedis.hgetAll(key).toString();
+                    break;
+                case "zset":
+                    value = jedis.zrange(key, 0, -1).toString();
+                    break;
+                default:
+                    value = "(unknown type)";
+            }
+            
             rows.add(Map.of(
                 "key", key,
                 "type", type,
+                "value", value != null ? value : "(nil)",
                 "ttl", ttl == -1 ? "no expiry" : ttl + "s"
             ));
         }
@@ -165,7 +289,7 @@ public class RedisQueryService {
         return QueryResult.builder()
             .success(true)
             .queryType("KEYS")
-            .columns(List.of("key", "type", "ttl"))
+            .columns(List.of("key", "type", "value", "ttl"))
             .rows(rows)
             .rowCount(rows.size())
             .executionTimeMs(System.currentTimeMillis() - startTime)
@@ -491,4 +615,23 @@ public class RedisQueryService {
             .executionTimeMs(System.currentTimeMillis() - startTime)
             .build();
     }
+    
+    public List<String> getKeys(DatabaseInstance instance) {
+        JedisPoolConfig poolConfig = new JedisPoolConfig();
+        poolConfig.setMaxTotal(10);
+        
+        String host = "localhost";
+        
+        try (JedisPool pool = new JedisPool(poolConfig, host, instance.getPort(), 2000, instance.getPassword());
+             Jedis jedis = pool.getResource()) {
+            
+            Set<String> keys = jedis.keys("*");
+            return new ArrayList<>(keys);
+            
+        } catch (Exception e) {
+            log.error("Failed to get Redis keys: {}", e.getMessage());
+            return new ArrayList<>();
+        }
+    }
 }
+

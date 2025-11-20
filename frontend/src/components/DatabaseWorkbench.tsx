@@ -97,13 +97,35 @@ export default function DatabaseWorkbench({ database, isOpen, onClose }: Databas
       addToQueryHistory(database.id, query, executionTime, result.success ? 'success' : 'error');
       
       // Refresh schema if query was successful and modifies data or structure
-      if (result.success && result.queryType && ['CREATE', 'ALTER', 'DROP', 'INSERT', 'UPDATE', 'DELETE', 'TRUNCATE'].includes(result.queryType)) {
-        // Add small delay for MySQL/MariaDB to ensure table is fully created
-        if (['mysql', 'mariadb'].includes(currentDatabase.databaseType.toLowerCase())) {
+      if (result.success && result.queryType && ['CREATE', 'ALTER', 'DROP', 'INSERT', 'UPDATE', 'DELETE', 'TRUNCATE', 'SET'].includes(result.queryType)) {
+        // Add small delay for MySQL/MariaDB/MongoDB/Redis to ensure operation is fully committed
+        if (['mysql', 'mariadb', 'mongodb', 'redis'].includes(currentDatabase.databaseType.toLowerCase())) {
           await new Promise(resolve => setTimeout(resolve, 500));
         }
         // Immediate refresh for better UX
         await loadSchema();
+        
+        // Refresh any open table tabs
+        const tableTabs = tabs.filter(t => t.type === 'table' && t.tableName);
+        for (const tab of tableTabs) {
+          try {
+            let query: string;
+            const dbType = currentDatabase.databaseType.toLowerCase();
+            
+            if (dbType === 'mongodb') {
+              query = `db.${tab.tableName}.find()`;
+            } else if (dbType === 'redis') {
+              query = `KEYS ${tab.tableName}`;
+            } else {
+              query = `SELECT * FROM ${tab.tableName} LIMIT 100`;
+            }
+            
+            const tableResult = await databaseApi.executeQuery(database.id, query, 100, 30);
+            setTableData(prev => ({ ...prev, [tab.tableName!]: tableResult }));
+          } catch (error) {
+            console.error(`Failed to refresh table ${tab.tableName}:`, error);
+          }
+        }
       }
     } catch (err) {
       const executionTime = Date.now() - startTime;
@@ -134,6 +156,8 @@ export default function DatabaseWorkbench({ database, isOpen, onClose }: Databas
     
     // The query will be inserted into the editor through a state update
     setGeneratedQuery(query);
+    // Reset after a short delay to allow the editor to receive it
+    setTimeout(() => setGeneratedQuery(undefined), 100);
   };
 
   const handleTableSelect = async (tableName: string) => {
@@ -157,7 +181,20 @@ export default function DatabaseWorkbench({ database, isOpen, onClose }: Databas
     // Load table data
     setIsExecuting(true);
     try {
-      const result = await databaseApi.executeQuery(database.id, `SELECT * FROM ${tableName} LIMIT 100`, 100, 30);
+      // Use appropriate query syntax based on database type
+      let query: string;
+      const dbType = currentDatabase.databaseType.toLowerCase();
+      
+      if (dbType === 'mongodb') {
+        query = `db.${tableName}.find()`;
+      } else if (dbType === 'redis') {
+        // tableName already includes the pattern (e.g., "user:*")
+        query = `KEYS ${tableName}`;
+      } else {
+        query = `SELECT * FROM ${tableName} LIMIT 100`;
+      }
+      
+      const result = await databaseApi.executeQuery(database.id, query, 100, 30);
       setTableData({ ...tableData, [tableName]: result });
     } catch (err) {
       setTableData({ ...tableData, [tableName]: {
@@ -278,10 +315,12 @@ export default function DatabaseWorkbench({ database, isOpen, onClose }: Databas
             <SchemaExplorer 
               schema={schema} 
               isLoading={schemaLoading}
+              databaseType={currentDatabase.databaseType}
               onTableSelect={handleTableSelect}
               onTableStructure={handleTableStructure}
               onRefresh={loadSchema}
               onQueryGenerate={handleQueryGenerate}
+              onQueryExecute={handleQueryExecute}
             />
           </div>
 
@@ -336,6 +375,7 @@ export default function DatabaseWorkbench({ database, isOpen, onClose }: Databas
                     databaseType={currentDatabase.databaseType}
                     onQueryExecute={handleQueryExecute}
                     isExecuting={isExecuting}
+                    generatedQuery={generatedQuery}
                   />
                 </div>
                 <div className="flex-1">
@@ -359,20 +399,91 @@ export default function DatabaseWorkbench({ database, isOpen, onClose }: Databas
               </div>
             )}
 
-            {activeTab.type === 'structure' && tableInfo && (
+            {activeTab.type === 'structure' && activeTab.tableName && (
               <div className="flex-1 overflow-auto p-4 bg-zinc-950/30">
                 <div className="max-w-5xl">
-                  {/* Table Header */}
-                  <div className="mb-4">
-                    <h3 className="text-lg font-semibold text-zinc-100 mb-1">{tableInfo.name}</h3>
-                    <div className="text-sm text-zinc-500">
-                      {tableInfo.rowCount !== null && `${tableInfo.rowCount.toLocaleString()} rows`} • {tableInfo.type}
-                    </div>
-                  </div>
+                  {/* Redis Key Pattern Info */}
+                  {currentDatabase.databaseType.toLowerCase() === 'redis' ? (
+                    <>
+                      <div className="mb-4">
+                        <h3 className="text-lg font-semibold text-zinc-100 mb-1">{activeTab.tableName}</h3>
+                        <div className="text-sm text-zinc-500">
+                          KEY PATTERN
+                        </div>
+                      </div>
+                      
+                      <div className="p-4 rounded-lg bg-zinc-900/50 border border-zinc-800">
+                        <div className="space-y-3">
+                          <div>
+                            <h4 className="text-sm font-semibold text-zinc-300 mb-2">Redis Key-Value Store</h4>
+                            <div className="text-sm text-zinc-400">
+                              <p className="mb-2">Redis is a schema-less key-value store. This pattern groups related keys together.</p>
+                              <p className="text-zinc-500">Click the data tab to view all keys matching this pattern and their values.</p>
+                            </div>
+                          </div>
+                          
+                          <div className="pt-3 border-t border-zinc-800">
+                            <div className="text-xs text-zinc-500">
+                              <p className="font-semibold text-zinc-400 mb-1">Common Operations:</p>
+                              <ul className="space-y-1 ml-4 list-disc">
+                                <li>View all keys: <code className="text-violet-400">KEYS {activeTab.tableName}</code></li>
+                                <li>Get a value: <code className="text-violet-400">GET &lt;key&gt;</code></li>
+                                <li>Set a value: <code className="text-violet-400">SET &lt;key&gt; &lt;value&gt;</code></li>
+                                <li>Delete a key: <code className="text-violet-400">DEL &lt;key&gt;</code></li>
+                              </ul>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </>
+                  ) : currentDatabase.databaseType.toLowerCase() === 'mongodb' ? (
+                    <>
+                      <div className="mb-4">
+                        <h3 className="text-lg font-semibold text-zinc-100 mb-1">{activeTab.tableName}</h3>
+                        <div className="text-sm text-zinc-500">
+                          COLLECTION
+                        </div>
+                      </div>
+                      
+                      <div className="p-4 rounded-lg bg-zinc-900/50 border border-zinc-800">
+                        <div className="space-y-3">
+                          <div>
+                            <h4 className="text-sm font-semibold text-zinc-300 mb-2">Collection Information</h4>
+                            <div className="text-sm text-zinc-400">
+                              <p className="mb-2">MongoDB uses a flexible schema model. Documents in this collection can have different fields.</p>
+                              <p className="text-zinc-500">To view the structure, examine the documents in the data tab or run:</p>
+                              <pre className="mt-2 p-2 bg-zinc-950 rounded border border-zinc-800 text-zinc-300 font-mono text-xs">
+                                db.{activeTab.tableName}.findOne()
+                              </pre>
+                            </div>
+                          </div>
+                          
+                          <div className="pt-3 border-t border-zinc-800">
+                            <div className="text-xs text-zinc-500">
+                              <p className="font-semibold text-zinc-400 mb-1">Common Operations:</p>
+                              <ul className="space-y-1 ml-4 list-disc">
+                                <li>View all documents: <code className="text-violet-400">db.{activeTab.tableName}.find()</code></li>
+                                <li>Count documents: <code className="text-violet-400">db.{activeTab.tableName}.countDocuments()</code></li>
+                                <li>Get indexes: <code className="text-violet-400">db.{activeTab.tableName}.getIndexes()</code></li>
+                              </ul>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </>
+                  ) : tableInfo ? (
+                    <>
+                      {/* SQL Table Header */}
+                      <div className="mb-4">
+                        <h3 className="text-lg font-semibold text-zinc-100 mb-1">{tableInfo.name}</h3>
+                        <div className="text-sm text-zinc-500">
+                          {tableInfo.rowCount !== null && `${tableInfo.rowCount.toLocaleString()} rows`} • {tableInfo.type}
+                        </div>
+                      </div>
 
-                  {/* Columns Table */}
-                  <div className="mb-6">
-                    <h4 className="text-sm font-semibold text-zinc-300 mb-2">Columns ({tableInfo.columns.length})</h4>
+                      {/* Columns Table */}
+                      <div className="mb-6">
+                        <h4 className="text-sm font-semibold text-zinc-300 mb-2">Columns ({tableInfo.columns.length})</h4>
                     <div className="border border-zinc-800 rounded-lg overflow-hidden">
                       <table className="w-full">
                         <thead className="bg-zinc-900/50">
@@ -456,6 +567,8 @@ export default function DatabaseWorkbench({ database, isOpen, onClose }: Databas
                       </div>
                     </div>
                   )}
+                    </>
+                  ) : null}
                 </div>
               </div>
             )}

@@ -1,14 +1,17 @@
 import { useState, useEffect } from 'react';
 import { ChevronRight, ChevronDown, Table, Columns, Key, Database as DatabaseIcon, Loader2, RefreshCw, 
          Plus, Trash2, Edit, FileText, Copy, Download } from 'lucide-react';
+import ConfirmDialog from './ConfirmDialog';
 
 interface SchemaExplorerProps {
   schema: SchemaInfo | null;
   isLoading: boolean;
+  databaseType?: string;
   onTableSelect?: (tableName: string) => void;
   onTableStructure?: (tableName: string) => void;
   onRefresh?: () => void;
   onQueryGenerate?: (query: string) => void;
+  onQueryExecute?: (query: string) => void;
 }
 
 interface SchemaInfo {
@@ -40,9 +43,26 @@ interface IndexInfo {
   columns: string[];
 }
 
-export default function SchemaExplorer({ schema, isLoading, onTableSelect, onTableStructure, onRefresh, onQueryGenerate }: SchemaExplorerProps) {
+function getExampleQuery(databaseType?: string): string {
+  const dbType = databaseType?.toLowerCase() || 'mysql';
+  
+  if (dbType === 'postgresql') {
+    return `CREATE TABLE users (\n  id SERIAL PRIMARY KEY,\n  name VARCHAR(100)\n);`;
+  } else if (dbType === 'mysql' || dbType === 'mariadb') {
+    return `CREATE TABLE users (\n  id INT AUTO_INCREMENT PRIMARY KEY,\n  name VARCHAR(100)\n);`;
+  } else if (dbType === 'mongodb') {
+    return `// Welcome to DBForge MongoDB Query Editor!\n// Create your first document:\n\ndb.users.insertOne({\n  name: "John Doe",\n  email: "john@example.com",\n  created_at: new Date()\n});\n\n// Query your data:\n// db.users.find({});`;
+  } else if (dbType === 'redis') {
+    return `# Welcome to DBForge Redis Query Editor!\n# Set a key-value pair:\n\nSET user:1:name "John Doe"\nSET user:1:email "john@example.com"\n\n# Get a value:\n# GET user:1:name\n\n# List all keys:\n# KEYS *`;
+  }
+  
+  return `CREATE TABLE users (\n  id INT PRIMARY KEY,\n  name VARCHAR(100)\n);`;
+}
+
+export default function SchemaExplorer({ schema, isLoading, databaseType, onTableSelect, onTableStructure, onRefresh, onQueryGenerate, onQueryExecute }: SchemaExplorerProps) {
   const [expandedTables, setExpandedTables] = useState<Set<string>>(new Set());
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; table: TableInfo } | null>(null);
+  const [confirmDialog, setConfirmDialog] = useState<{ title: string; message: string; action: () => void; variant: 'danger' | 'warning' } | null>(null);
 
   const toggleTable = (tableName: string) => {
     const newExpanded = new Set(expandedTables);
@@ -66,7 +86,7 @@ export default function SchemaExplorer({ schema, isLoading, onTableSelect, onTab
   const handleGenerateSelect = () => {
     if (contextMenu) {
       const columns = contextMenu.table.columns.map(c => c.name).join(', ');
-      onQueryGenerate?.(`SELECT ${columns}\nFROM ${contextMenu.table.name}\nWHERE ;`);
+      onQueryGenerate?.(`SELECT ${columns}\nFROM ${contextMenu.table.name};`);
       setContextMenu(null);
     }
   };
@@ -74,7 +94,29 @@ export default function SchemaExplorer({ schema, isLoading, onTableSelect, onTab
   const handleGenerateInsert = () => {
     if (contextMenu) {
       const columns = contextMenu.table.columns.map(c => c.name).join(', ');
-      const values = contextMenu.table.columns.map(() => '?').join(', ');
+      // Generate appropriate placeholders based on column type
+      const values = contextMenu.table.columns.map(c => {
+        const type = c.dataType.toLowerCase();
+        const name = c.name.toLowerCase();
+        
+        // For timestamp/date columns, use NOW() or CURRENT_TIMESTAMP
+        if (type.includes('timestamp') || type.includes('datetime') || 
+            (type.includes('date') && !type.includes('update')) ||
+            name.includes('created_at') || name.includes('updated_at') || 
+            name.includes('createdat') || name.includes('updatedat')) {
+          return 'NOW()';
+        }
+        
+        // For numeric types, use unquoted placeholder
+        if (type.includes('int') || type.includes('numeric') || type.includes('decimal') || 
+            type.includes('float') || type.includes('double') || type.includes('real') ||
+            type.includes('serial') || type.includes('bigserial') || type.includes('smallserial')) {
+          return '?';
+        }
+        
+        // For all other types (text, varchar, etc.), use quoted placeholder
+        return "'?'";
+      }).join(', ');
       onQueryGenerate?.(`INSERT INTO ${contextMenu.table.name} (${columns})\nVALUES (${values});`);
       setContextMenu(null);
     }
@@ -82,9 +124,34 @@ export default function SchemaExplorer({ schema, isLoading, onTableSelect, onTab
 
   const handleGenerateUpdate = () => {
     if (contextMenu) {
-      const sets = contextMenu.table.columns.filter(c => !c.primaryKey).map(c => `${c.name} = ?`).join(',\n  ');
+      const sets = contextMenu.table.columns.filter(c => !c.primaryKey).map(c => {
+        const type = c.dataType.toLowerCase();
+        const name = c.name.toLowerCase();
+        
+        // For timestamp/date columns, use NOW()
+        if (type.includes('timestamp') || type.includes('datetime') || 
+            (type.includes('date') && !type.includes('update')) ||
+            name.includes('updated_at') || name.includes('updatedat') || 
+            name.includes('modified_at') || name.includes('modifiedat')) {
+          return `${c.name} = NOW()`;
+        }
+        
+        // For numeric types, use unquoted placeholder
+        if (type.includes('int') || type.includes('numeric') || type.includes('decimal') || 
+            type.includes('float') || type.includes('double') || type.includes('real') ||
+            type.includes('serial') || type.includes('bigserial') || type.includes('smallserial')) {
+          return `${c.name} = ?`;
+        }
+        
+        // For all other types (text, varchar, etc.), use quoted placeholder
+        return `${c.name} = '?'`;
+      }).join(',\n  ');
+      
       const pkCol = contextMenu.table.columns.find(c => c.primaryKey)?.name || 'id';
-      onQueryGenerate?.(`UPDATE ${contextMenu.table.name}\nSET\n  ${sets}\nWHERE ${pkCol} = ?;`);
+      const pkType = contextMenu.table.columns.find(c => c.primaryKey)?.dataType.toLowerCase() || '';
+      const pkValue = pkType.includes('int') || pkType.includes('numeric') || pkType.includes('serial') ? '?' : "'?'";
+      
+      onQueryGenerate?.(`UPDATE ${contextMenu.table.name}\nSET\n  ${sets}\nWHERE ${pkCol} = ${pkValue};`);
       setContextMenu(null);
     }
   };
@@ -99,14 +166,32 @@ export default function SchemaExplorer({ schema, isLoading, onTableSelect, onTab
 
   const handleTruncateTable = () => {
     if (contextMenu) {
-      onQueryGenerate?.(`TRUNCATE TABLE ${contextMenu.table.name};`);
+      const tableName = contextMenu.table.name;
+      setConfirmDialog({
+        title: 'Truncate Table',
+        message: `Are you sure you want to truncate table "${tableName}"? This will delete all rows but keep the table structure.`,
+        variant: 'warning',
+        action: () => {
+          onQueryExecute?.(`TRUNCATE TABLE ${tableName};`);
+          setConfirmDialog(null);
+        }
+      });
       setContextMenu(null);
     }
   };
 
   const handleDropTable = () => {
     if (contextMenu) {
-      onQueryGenerate?.(`DROP TABLE ${contextMenu.table.name};`);
+      const tableName = contextMenu.table.name;
+      setConfirmDialog({
+        title: 'Drop Table',
+        message: `Are you sure you want to DROP table "${tableName}"? This action cannot be undone and will permanently delete the table and all its data.`,
+        variant: 'danger',
+        action: () => {
+          onQueryExecute?.(`DROP TABLE ${tableName};`);
+          setConfirmDialog(null);
+        }
+      });
       setContextMenu(null);
     }
   };
@@ -164,11 +249,8 @@ export default function SchemaExplorer({ schema, isLoading, onTableSelect, onTab
               Create your first table by running:
             </p>
             <div className="mt-3 p-2 rounded bg-zinc-900/50 border border-zinc-800 text-left">
-              <code className="text-xs text-emerald-400 font-mono">
-                CREATE TABLE users (<br/>
-                &nbsp;&nbsp;id INT PRIMARY KEY,<br/>
-                &nbsp;&nbsp;name VARCHAR(100)<br/>
-                );
+              <code className="text-xs text-emerald-400 font-mono" style={{ whiteSpace: 'pre-wrap' }}>
+                {getExampleQuery(databaseType)}
               </code>
             </div>
           </div>
@@ -402,6 +484,20 @@ export default function SchemaExplorer({ schema, isLoading, onTableSelect, onTab
           </button>
         </div>
       )}
+      
+      {/* Confirm Dialog */}
+      <ConfirmDialog
+        isOpen={!!confirmDialog}
+        title={confirmDialog?.title || ''}
+        message={confirmDialog?.message || ''}
+        variant={confirmDialog?.variant || 'warning'}
+        confirmLabel={confirmDialog?.variant === 'danger' ? 'Drop Table' : 'Truncate'}
+        cancelLabel="Cancel"
+        onConfirm={() => {
+          confirmDialog?.action();
+        }}
+        onCancel={() => setConfirmDialog(null)}
+      />
     </div>
   );
 }

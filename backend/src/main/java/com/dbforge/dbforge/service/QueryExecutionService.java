@@ -66,6 +66,12 @@ public class QueryExecutionService {
         try (Statement stmt = conn.createStatement()) {
             // Apply limit if provided
             String query = request.getQuery().trim();
+            
+            // Remove trailing semicolon if present
+            if (query.endsWith(";")) {
+                query = query.substring(0, query.length() - 1).trim();
+            }
+            
             if (request.getLimit() != null && !query.toLowerCase().contains("limit")) {
                 query += " LIMIT " + request.getLimit();
             }

@@ -110,8 +110,8 @@ export default function ResultsGrid({ result }: ResultsGridProps) {
     );
   }
 
-  // Non-SELECT queries (INSERT, UPDATE, DELETE)
-  if (result.queryType !== 'SELECT') {
+  // Non-SELECT/FIND/KEYS queries (INSERT, UPDATE, DELETE)
+  if (result.queryType !== 'SELECT' && result.queryType !== 'FIND' && result.queryType !== 'KEYS' && result.queryType !== 'GET') {
     return (
       <div className="flex flex-col h-full bg-zinc-950/30">
         <div className="px-4 py-3 border-b border-zinc-800/50 bg-emerald-500/10">

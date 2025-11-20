@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import Editor from '@monaco-editor/react';
 import { Play, Loader2, Clock, Sparkles, Copy, Eraser, Book, History } from 'lucide-react';
 import type { editor } from 'monaco-editor';
@@ -9,6 +9,7 @@ interface QueryEditorProps {
   onQueryExecute: (query: string) => Promise<void>;
   isExecuting: boolean;
   initialQuery?: string;
+  generatedQuery?: string;
   onShowHistory?: () => void;
 }
 
@@ -18,6 +19,7 @@ export default function QueryEditor({
   onQueryExecute, 
   isExecuting,
   initialQuery,
+  generatedQuery,
   onShowHistory
 }: QueryEditorProps) {
   
@@ -89,6 +91,14 @@ SET user:1:email "john@example.com"
   const [query, setQuery] = useState(initialQuery || getDefaultQuery());
 
   const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
+
+  useEffect(() => {
+    if (generatedQuery) {
+      setQuery(generatedQuery);
+      // Clear the generated query after setting it
+      // This is handled by the parent component
+    }
+  }, [generatedQuery]);
 
   const handleExecute = () => {
     if (!query.trim() || isExecuting) return;

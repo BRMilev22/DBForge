@@ -76,7 +76,10 @@ public class DatabaseService {
         DatabaseVersion dbVersion = versionRepository.findByDatabaseTypeIdAndIsDefaultTrue(dbType.getId())
                 .orElseThrow(() -> new RuntimeException("No default version found for database type: " + databaseTypeName));
         
-        String fullImageName = dbType.getDockerImage() + ":" + dbVersion.getDockerTag();
+        // If docker_image already has a version tag (contains :), use it as-is
+        String fullImageName = dbType.getDockerImage().contains(":") 
+            ? dbType.getDockerImage() 
+            : dbType.getDockerImage() + ":" + dbVersion.getDockerTag();
         
         int port = allocatePort(dbType);
         
