@@ -359,19 +359,12 @@ export default function DatabaseDetailsModal({
                   <div className="flex items-center gap-2">
                     {
                       database.apiToken ? (
-                        (() => {
-                          let short = database.apiToken as string;
-                          if ((database.apiToken as string).length > 35) {
-                            const start = (database.apiToken as string).substring(0, 17);
-                            const end = (database.apiToken as string).substring((database.apiToken as string).length - 17);
-                            short = `${start}…${end}`;
-                          }
-                          return (
-                            <code title={database.apiToken} className="flex-1 px-3 py-2 rounded-lg bg-zinc-950 border border-zinc-800 text-zinc-300 font-mono text-[11px] truncate">
-                              {short}
-                            </code>
-                          );
-                        })()
+                        <code
+                          title={database.apiToken}
+                          className="flex-1 px-3 py-2 rounded-lg bg-zinc-950 border border-zinc-800 text-zinc-300 font-mono text-[11px] break-all"
+                        >
+                          {database.apiToken}
+                        </code>
                       ) : (
                           <div className="flex items-center gap-2">
                             <code className="flex-1 px-3 py-2 rounded-lg bg-zinc-950 border border-zinc-800 text-zinc-300 font-mono text-[11px] truncate">

@@ -91,8 +91,10 @@ public class ApiTokenService {
         // random part length excluding prefix
         int randomPartLength = Math.max(8, totalLength - TOKEN_PREFIX.length());
 
-        String rawToken = generateAlphanumericToken(randomPartLength);
-        rawToken = TOKEN_PREFIX + rawToken;
+        String rawToken;
+        do {
+            rawToken = TOKEN_PREFIX + generateAlphanumericToken(randomPartLength);
+        } while (rawToken.contains("."));
 
         String tokenHash = hashToken(rawToken);
 
@@ -213,10 +215,14 @@ public class ApiTokenService {
      * Generate a cryptographically secure random token
      */
     private String generateToken() {
-        byte[] randomBytes = new byte[TOKEN_LENGTH];
-        new SecureRandom().nextBytes(randomBytes);
-        String encodedToken = Base64.getUrlEncoder().withoutPadding().encodeToString(randomBytes);
-        return TOKEN_PREFIX + encodedToken;
+        String token;
+        do {
+            byte[] randomBytes = new byte[TOKEN_LENGTH];
+            new SecureRandom().nextBytes(randomBytes);
+            String encodedToken = Base64.getUrlEncoder().withoutPadding().encodeToString(randomBytes);
+            token = TOKEN_PREFIX + encodedToken;
+        } while (token.contains("."));
+        return token;
     }
 
     private String generateAlphanumericToken(int length) {

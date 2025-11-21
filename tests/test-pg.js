@@ -12,9 +12,9 @@ const run = async () => {
     console.log(await client.connect());
     console.log(await client.query('SELECT 1;'));
     console.log(await client.select('users', { limit: 5 }));
-    //console.log(await client.insert('users', { name: 'Pacheto', email: 'pacheto@test.com' }));
-    //console.log(await client.insert('users', { name: 'Boris', email: 'boris@test.com'}));
-    console.log(await client.delete('users', {name: 'Pacheto'}));
+    console.log(await client.insert('users', { name: 'Vesko', email: 'vesko@test.com' }));
+    console.log(await client.insert('users', { name: 'Boris', email: 'boris@test.com'}));
+    console.log(await client.delete('users', {name: 'Boris'}));
 
   } finally {
     await client.disconnect();
