@@ -33,3 +33,11 @@ export interface CreateDatabaseRequest {
   dbUsername: string;
   dbPassword: string;
 }
+
+export interface ExportRequestPayload {
+  format: 'csv' | 'json' | 'sql';
+  tables?: string[];
+  includeSchema?: boolean;
+  includeHeaders?: boolean;
+  limit?: number;
+}

@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { Plus, Database, RefreshCw, AlertCircle, Play, Square, Trash2, Copy, Check, Activity, Zap, HardDrive, Gauge, Clock, TrendingUp, Settings, BarChart3, FileText, Download, Code } from 'lucide-react';
+import { Plus, Database, RefreshCw, AlertCircle, Play, Square, Trash2, Copy, Check, Activity, Zap, HardDrive, Clock, Settings, BarChart3, FileText, Download, Code } from 'lucide-react';
 import { databaseApi, analyticsApi, type AnalyticsResponse } from './services/api';
 import CreateDatabaseModal from './components/CreateDatabaseModal';
 import DatabaseSelector from './components/DatabaseSelector';
@@ -18,7 +18,6 @@ function App() {
   const [databaseTypes, setDatabaseTypes] = useState<DatabaseType[]>([]);
   const [analytics, setAnalytics] = useState<AnalyticsResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [showDatabaseSelector, setShowDatabaseSelector] = useState(false);
@@ -31,6 +30,7 @@ function App() {
   const [selectedDatabase, setSelectedDatabase] = useState<DatabaseInstance | null>(null);
   const [workbenchDatabase, setWorkbenchDatabase] = useState<DatabaseInstance | null>(null);
   const [dbFilter, setDbFilter] = useState<string>('all');
+  const [showProfileMenu, setShowProfileMenu] = useState(false);
 
   const showToast = (message: string, type: 'success' | 'error') => {
     const id = Date.now();
@@ -62,42 +62,6 @@ function App() {
   };
 
   // Refresh overview data (analytics + database statuses) without resetting other UI state
-  const refreshOverview = async () => {
-    if (!user) return;
-    try {
-      setIsRefreshing(true);
-      const [dbData, analyticsData] = await Promise.all([
-        databaseApi.getDatabases(),
-        analyticsApi.getAnalytics()
-      ]);
-
-      // Replace databases state but keep modals or selected items open by updating references
-      setDatabases(prev => {
-        // map new data but attempt to preserve extra properties from prev entries
-        const prevById = new Map(prev.map(d => [d.id, d]));
-        return dbData.map(d => ({ ...(prevById.get(d.id) || {}), ...d }));
-      });
-
-      setAnalytics(analyticsData);
-
-      // If a database detail/workbench was open, update its reference to the fresh object
-      setSelectedDatabase(prev => {
-        if (!prev) return prev;
-        return dbData.find(d => d.id === prev.id) || prev;
-      });
-
-      setWorkbenchDatabase(prev => {
-        if (!prev) return prev;
-        return dbData.find(d => d.id === prev.id) || prev;
-      });
-    } catch (err) {
-      console.error('Failed to refresh overview:', err);
-      showToast('Failed to refresh overview', 'error');
-    } finally {
-      setIsRefreshing(false);
-    }
-  };
-
   const loadDatabaseTypes = async () => {
     try {
       const types = await databaseApi.getTypes();
@@ -206,7 +170,6 @@ function App() {
   // Use real analytics data or fallback to database count
   const runningDatabases = analytics?.metrics.runningDatabases ?? databases.filter(db => db.status === 'RUNNING').length;
   const totalStorage = analytics?.metrics.totalStorage ?? 0;
-  const uptime = analytics?.metrics.uptime ?? 0;
   const databaseTypeOptions = Array.from(new Set(databases.map(d => d.databaseType.toLowerCase())));
   const filteredDatabases = dbFilter === 'all'
     ? databases
@@ -297,19 +260,25 @@ function App() {
         </nav>
 
         <div className="flex flex-col items-center gap-3">
-          <div className="relative group">
-            <div className="w-8 h-8 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center text-xs font-medium text-zinc-300">
+          <div
+            className="relative"
+            onMouseEnter={() => setShowProfileMenu(true)}
+            onMouseLeave={() => setShowProfileMenu(false)}
+          >
+            <div className="w-8 h-8 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center text-xs font-medium text-zinc-300 cursor-pointer">
               {user.username.charAt(0).toUpperCase()}
             </div>
-            <div className="absolute left-full ml-3 bottom-0 w-40 p-2 bg-zinc-900 border border-zinc-800 rounded-lg opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto transition-opacity shadow-xl">
-              <div className="text-xs font-medium text-zinc-300">{user.username}</div>
-              <button
-                onClick={logout}
-                className="w-full mt-2 px-2 py-1 text-xs bg-zinc-800 text-zinc-300 rounded hover:bg-zinc-700 transition"
-              >
-                Logout
-              </button>
-            </div>
+            {showProfileMenu && (
+              <div className="absolute left-full ml-2 bottom-0 w-44 p-3 bg-zinc-900 border border-zinc-800 rounded-lg shadow-xl">
+                <div className="text-xs font-medium text-zinc-200">{user.username}</div>
+                <button
+                  onClick={logout}
+                  className="w-full mt-3 px-3 py-2 text-xs bg-zinc-800 text-zinc-200 rounded hover:bg-zinc-700 transition text-left"
+                >
+                  Logout
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </aside>

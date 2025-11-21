@@ -1,5 +1,5 @@
 import axios from 'axios';
-import type { DatabaseType, DatabaseInstance, CreateDatabaseRequest } from '../types/database';
+import type { DatabaseType, DatabaseInstance, CreateDatabaseRequest, ExportRequestPayload } from '../types/database';
 
 export interface AnalyticsResponse {
   metrics: {
@@ -105,6 +105,24 @@ export const databaseApi = {
   getSchema: async (id: number) => {
     const response = await api.get(`/databases/${id}/schema`);
     return response.data;
+  },
+
+  // Export database or specific tables
+  exportDatabase: async (id: number, payload: ExportRequestPayload) => {
+    const response = await api.post(`/databases/${id}/export`, payload, {
+      responseType: 'blob',
+    });
+
+    const disposition = response.headers['content-disposition'] as string | undefined;
+    let filename = 'dbforge-export';
+    if (disposition) {
+      const match = disposition.match(/filename=\"?([^\";]+)\"?/i);
+      if (match?.[1]) {
+        filename = match[1];
+      }
+    }
+
+    return { blob: response.data as Blob, filename };
   },
 };
 

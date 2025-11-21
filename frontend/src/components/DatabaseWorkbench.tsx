@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { X, Database as DatabaseIcon, Plus, Code, Table as TableIcon } from 'lucide-react';
+import { X, Database as DatabaseIcon, Plus, Code, Table as TableIcon, Download } from 'lucide-react';
 import QueryEditor from './QueryEditor';
 import SchemaExplorer from './SchemaExplorer';
 import ResultsGrid from './ResultsGrid';
@@ -8,6 +8,7 @@ import QueryHistory from './QueryHistory';
 import { addToQueryHistory } from './QueryHistory';
 import { databaseApi } from '../services/api';
 import type { DatabaseInstance } from '../types/database';
+import DataExportDialog from './DataExportDialog';
 
 interface Tab {
   id: string;
@@ -50,6 +51,7 @@ export default function DatabaseWorkbench({ database, isOpen, onClose }: Databas
   const [showHistory, setShowHistory] = useState(false);
   const [generatedQuery, setGeneratedQuery] = useState<string>('');
   const [tableRefreshTokens, setTableRefreshTokens] = useState<Record<string, number>>({});
+  const [showExportDialog, setShowExportDialog] = useState(false);
 
   // Refresh database status when opened
   useEffect(() => {
@@ -220,6 +222,13 @@ export default function DatabaseWorkbench({ database, isOpen, onClose }: Databas
   const activeTab = tabs.find(t => t.id === activeTabId) || tabs[0];
   const tableInfo = activeTab.tableName && schema?.tables.find(t => t.name === activeTab.tableName);
 
+  const handleOpenExport = async () => {
+    if (!schema && !schemaLoading) {
+      await loadSchema();
+    }
+    setShowExportDialog(true);
+  };
+
   if (!isOpen) return null;
 
   if (currentDatabase.status !== 'RUNNING') {
@@ -265,12 +274,21 @@ export default function DatabaseWorkbench({ database, isOpen, onClose }: Databas
               </div>
             </div>
           </div>
-          <button
-            onClick={onClose}
-            className="w-8 h-8 rounded-lg bg-zinc-900 hover:bg-zinc-800 flex items-center justify-center transition"
-          >
-            <X className="w-4 h-4 text-zinc-400" />
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleOpenExport}
+              className="px-3 py-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-zinc-200 text-sm flex items-center gap-2 transition"
+            >
+              <Download className="w-4 h-4" />
+              <span className="hidden sm:inline">Export</span>
+            </button>
+            <button
+              onClick={onClose}
+              className="w-8 h-8 rounded-lg bg-zinc-900 hover:bg-zinc-800 flex items-center justify-center transition"
+            >
+              <X className="w-4 h-4 text-zinc-400" />
+            </button>
+          </div>
         </div>
 
         {/* Main Content */}
@@ -563,6 +581,14 @@ export default function DatabaseWorkbench({ database, isOpen, onClose }: Databas
           </div>
         </div>
       </div>
+
+      <DataExportDialog
+        isOpen={showExportDialog}
+        onClose={() => setShowExportDialog(false)}
+        database={currentDatabase}
+        schemaTables={schema?.tables}
+        loadingSchema={schemaLoading}
+      />
     </div>
   );
 }
