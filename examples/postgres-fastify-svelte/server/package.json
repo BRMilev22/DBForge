@@ -1,0 +1,31 @@
+{
+  "name": "dbforge-postgres-fastify",
+  "version": "0.1.0",
+  "description": "Fastify API that uses the DBForge Framework to talk to PostgreSQL.",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "start": "NODE_ENV=production tsx src/server.ts",
+    "build": "tsc -p tsconfig.json && node ./dist/server.js",
+    "db:bootstrap": "tsx scripts/bootstrap.ts"
+  },
+  "keywords": [
+    "fastify",
+    "dbforge",
+    "postgresql"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@fastify/cors": "^11.1.0",
+    "dbforge-framework": "^0.1.0",
+    "dotenv": "^17.2.3",
+    "fastify": "^5.6.2",
+    "zod": "^4.1.12"
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.1",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3"
+  }
+}

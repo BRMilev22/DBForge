@@ -1,0 +1,53 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "dbforge-framework"
+version = "0.1.0"
+description = "Unified database client for PostgreSQL, MySQL, MariaDB, MongoDB, and Redis"
+readme = "README.md"
+authors = [
+    {name = "DBForge Team", email = "contact@dbforge.dev"}
+]
+license = {text = "MIT"}
+keywords = ["database", "postgresql", "mysql", "mongodb", "redis", "orm", "client"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Database",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+requires-python = ">=3.8"
+dependencies = [
+    "requests>=2.28.0",
+]
+
+[project.optional-dependencies]
+mysql = ["pymysql>=1.0.0"]
+postgresql = ["psycopg2-binary>=2.9.0"]
+mongodb = ["pymongo>=4.0.0"]
+redis = ["redis>=4.5.0"]
+all = [
+    "pymysql>=1.0.0",
+    "psycopg2-binary>=2.9.0",
+    "pymongo>=4.0.0",
+    "redis>=4.5.0",
+]
+
+[project.urls]
+Homepage = "https://dbforge.dev"
+Documentation = "https://dbforge.dev/docs"
+Repository = "https://github.com/BRMilev22/DBForge"
+Issues = "https://github.com/BRMilev22/DBForge/issues"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["dbforge_framework*"]

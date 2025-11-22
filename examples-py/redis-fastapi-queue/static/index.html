@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DBForge Redis Queue (FastAPI)</title>
+  <style>
+    :root { font-family: "Inter", system-ui, -apple-system, sans-serif; }
+    body { margin: 0; min-height: 100vh; background: radial-gradient(circle at 20% 20%, #1a0f2b, #0a0814 55%); color: #f5f0ff; display: flex; align-items: center; justify-content: center; }
+    .wrap { width: min(760px, 95vw); background: #0f0b1a; border: 1px solid #2e1f4a; border-radius: 16px; padding: 22px; box-shadow: 0 14px 60px rgba(0,0,0,0.45); }
+    h1 { margin: 0 0 6px; letter-spacing: -0.4px; }
+    p.sub { margin: 0 0 18px; color: #c5b6ff; }
+    form { display: grid; grid-template-columns: 1fr auto; gap: 10px; margin-bottom: 16px; }
+    input { padding: 12px 14px; border-radius: 10px; border: 1px solid #2c1f4a; background: #0b0714; color: #f5f0ff; }
+    button { border: 1px solid #ff8c61; background: #ff8c61; color: #2a0f00; padding: 12px 15px; border-radius: 10px; cursor: pointer; font-weight: 700; transition: transform 120ms ease, box-shadow 120ms ease; }
+    button:hover { transform: translateY(-1px); box-shadow: 0 10px 26px rgba(255,140,97,0.35); }
+    .row { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+    .jobs { border: 1px dashed #2c1f4a; padding: 12px; border-radius: 12px; min-height: 80px; background: #0d0817; }
+    .job { padding: 10px 12px; border-radius: 10px; background: #1a1030; border: 1px solid #2e1f4a; margin-bottom: 8px; }
+    .muted { color: #b19fe6; font-size: 13px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>DBForge Redis Queue</h1>
+    <p class="sub">LPUSH to enqueue, RPOP to consume. Backed by dbforge-framework.</p>
+
+    <form id="job-form">
+      <input id="payload" name="payload" placeholder="Job payload" required />
+      <button type="submit">Enqueue</button>
+    </form>
+
+    <div class="row">
+      <button id="consume">Consume next</button>
+      <button id="clear" style="background:#ff5c8a;border-color:#ff5c8a;">Clear queue</button>
+      <span class="muted" id="last"></span>
+    </div>
+
+    <div class="jobs" id="jobs"></div>
+  </div>
+
+  <script>
+    const jobsEl = document.getElementById("jobs");
+    const form = document.getElementById("job-form");
+    const consumeBtn = document.getElementById("consume");
+    const clearBtn = document.getElementById("clear");
+    const lastEl = document.getElementById("last");
+
+    const render = (jobs) => {
+      jobsEl.innerHTML = "";
+      if (!jobs.length) {
+        jobsEl.innerHTML = '<div class="muted">Queue empty.</div>';
+        return;
+      }
+      jobs.forEach((job) => {
+        const div = document.createElement("div");
+        div.className = "job";
+        div.textContent = job;
+        jobsEl.appendChild(div);
+      });
+    };
+
+    const fetchJobs = async () => {
+      const res = await fetch("/api/jobs");
+      if (!res.ok) return alert("Failed to fetch jobs");
+      render(await res.json());
+    };
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const payload = form.payload.value.trim();
+      if (!payload) return;
+      const res = await fetch("/api/jobs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ payload }),
+      });
+      if (!res.ok) return alert("Enqueue failed");
+      form.reset();
+      fetchJobs();
+    });
+
+    consumeBtn.addEventListener("click", async () => {
+      const res = await fetch("/api/jobs/consume", { method: "POST" });
+      if (!res.ok) return alert("Consume failed");
+      const data = await res.json();
+      lastEl.textContent = data.job ? `Consumed: ${data.job}` : "Queue empty.";
+      fetchJobs();
+    });
+
+    clearBtn.addEventListener("click", async () => {
+      const res = await fetch("/api/jobs", { method: "DELETE" });
+      if (!res.ok) return alert("Clear failed");
+      lastEl.textContent = "Cleared queue.";
+      fetchJobs();
+    });
+
+    fetchJobs();
+  </script>
+</body>
+</html>

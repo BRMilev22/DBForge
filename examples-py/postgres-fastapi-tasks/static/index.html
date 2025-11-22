@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DBForge PostgreSQL Tasks (FastAPI)</title>
+  <style>
+    :root { font-family: "Inter", system-ui, -apple-system, sans-serif; color-scheme: light; }
+    body { margin: 0; min-height: 100vh; background: radial-gradient(circle at 20% 20%, #1b2650, #0b1021 55%); color: #f4f6ff; display: flex; align-items: center; justify-content: center; }
+    .shell { width: min(880px, 94vw); background: #0f162f; border: 1px solid #1e2a4e; border-radius: 16px; padding: 22px; box-shadow: 0 16px 80px rgba(0,0,0,0.45); }
+    h1 { margin: 0 0 8px; letter-spacing: -0.4px; }
+    p.sub { margin: 0 0 18px; color: #9fb4ff; }
+    form { display: grid; grid-template-columns: 1fr auto; gap: 10px; margin-bottom: 16px; }
+    input { padding: 12px 14px; border-radius: 10px; border: 1px solid #23345b; background: #0c1327; color: #f4f6ff; }
+    button { border: 1px solid #42c2ff; background: #42c2ff; color: #032240; padding: 12px 16px; border-radius: 10px; cursor: pointer; transition: transform 120ms ease, box-shadow 120ms ease; font-weight: 600; }
+    button:hover { transform: translateY(-1px); box-shadow: 0 10px 30px rgba(66,194,255,0.35); }
+    .tasks { display: grid; gap: 10px; }
+    .task { padding: 12px; border-radius: 12px; border: 1px solid #1f2c4d; background: #0c1327; display: flex; align-items: center; justify-content: space-between; }
+    .task .info { display: flex; align-items: center; gap: 10px; }
+    .pill { padding: 4px 8px; border-radius: 999px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.6px; }
+    .pill.done { background: rgba(66,194,255,0.15); color: #42c2ff; border: 1px solid rgba(66,194,255,0.4); }
+    .pill.open { background: rgba(255,112,138,0.18); color: #ff708a; border: 1px solid rgba(255,112,138,0.45); }
+    .actions { display: flex; gap: 8px; }
+    .muted { color: #9fb4ff; font-size: 12px; }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <h1>DBForge PostgreSQL Tasks</h1>
+    <p class="sub">Toggle tasks to see UPDATEs; delete to see DELETEs. Powered by dbforge-framework.</p>
+
+    <form id="task-form">
+      <input id="title" name="title" placeholder="Add a task" required />
+      <button type="submit">Add</button>
+    </form>
+
+    <div class="tasks" id="tasks"></div>
+    <div class="muted" id="empty" hidden>No tasks yet.</div>
+  </div>
+
+  <script>
+    const listEl = document.getElementById("tasks");
+    const emptyEl = document.getElementById("empty");
+    const form = document.getElementById("task-form");
+
+    const render = (tasks) => {
+      listEl.innerHTML = "";
+      if (!tasks.length) {
+        emptyEl.hidden = false;
+        return;
+      }
+      emptyEl.hidden = true;
+      tasks.forEach((t) => {
+        const row = document.createElement("div");
+        row.className = "task";
+        row.innerHTML = `
+          <div class="info">
+            <span class="pill ${t.done ? "done" : "open"}">${t.done ? "Done" : "Open"}</span>
+            <div>
+              <div>${t.title}</div>
+              <div class="muted">${new Date(t.created_at).toLocaleString()}</div>
+            </div>
+          </div>
+          <div class="actions">
+            <button data-id="${t.id}" data-action="toggle">${t.done ? "Reopen" : "Complete"}</button>
+            <button data-id="${t.id}" data-action="delete" style="background:#ff708a;border-color:#ff708a;color:#20010a;">Delete</button>
+          </div>
+        `;
+        listEl.appendChild(row);
+      });
+    };
+
+    const fetchTasks = async () => {
+      const res = await fetch("/api/tasks");
+      if (!res.ok) return alert("Failed to load tasks");
+      render(await res.json());
+    };
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const title = form.title.value.trim();
+      if (!title) return;
+      const res = await fetch("/api/tasks", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title }),
+      });
+      if (!res.ok) return alert("Save failed");
+      form.reset();
+      fetchTasks();
+    });
+
+    listEl.addEventListener("click", async (e) => {
+      const btn = e.target.closest("button");
+      if (!btn) return;
+      const id = btn.dataset.id;
+      const action = btn.dataset.action;
+      if (action === "toggle") {
+        const res = await fetch(`/api/tasks/${id}/toggle`, { method: "POST" });
+        if (!res.ok) return alert("Toggle failed");
+      } else if (action === "delete") {
+        const res = await fetch(`/api/tasks/${id}`, { method: "DELETE" });
+        if (!res.ok) return alert("Delete failed");
+      }
+      fetchTasks();
+    });
+
+    fetchTasks();
+  </script>
+</body>
+</html>

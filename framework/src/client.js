@@ -1,5 +1,8 @@
 const DEFAULT_API_URL = 'http://localhost:8080/api';
 const SUPPORTED_SQL_DBS = ['mysql', 'mariadb', 'postgresql', 'postgres'];
+const SUPPORTED_NOSQL_DBS = ['mongodb', 'mongo'];
+const SUPPORTED_KV_DBS = ['redis'];
+const ALL_SUPPORTED_DBS = [...SUPPORTED_SQL_DBS, ...SUPPORTED_NOSQL_DBS, ...SUPPORTED_KV_DBS];
 
 const escapeLiteral = (value) => {
   if (value === null || value === undefined) return 'NULL';
@@ -23,6 +26,8 @@ const buildWhereClause = (where = {}) => {
 
 let mysqlModule = null;
 let pgModule = null;
+let mongoModule = null;
+let redisModule = null;
 
 const loadMysql = async () => {
   if (!mysqlModule) {
@@ -38,11 +43,25 @@ const loadPgClient = async () => {
   return pgModule.Client || pgModule;
 };
 
+const loadMongoClient = async () => {
+  if (!mongoModule) {
+    mongoModule = await import('mongodb');
+  }
+  return mongoModule.MongoClient;
+};
+
+const loadRedisClient = async () => {
+  if (!redisModule) {
+    redisModule = await import('redis');
+  }
+  return redisModule.createClient;
+};
+
 export class DbForgeClient {
   constructor(config) {
     this.config = config;
     this.mode = config.mode; // api | direct
-    this.driver = config.driver || null; // mysql | postgres
+    this.driver = config.driver || null; // mysql | postgres | mongodb | redis
     this.connection = null;
     this.connected = false;
     this.apiMode = 'public';
@@ -65,24 +84,35 @@ export class DbForgeClient {
     const parsed = new URL(connectionString);
     const protocol = parsed.protocol.replace(':', '').toLowerCase();
 
-    if (!SUPPORTED_SQL_DBS.includes(protocol)) {
+    if (!ALL_SUPPORTED_DBS.includes(protocol)) {
       throw new Error(`Unsupported database type: ${protocol}`);
     }
 
-    const driver = protocol.startsWith('post') ? 'postgres' : 'mysql';
-    const port = parsed.port
-      ? Number(parsed.port)
-      : driver === 'postgres'
-      ? 5432
-      : 3306;
+    let driver = 'mysql';
+    let port = 3306;
+
+    if (protocol.startsWith('post')) {
+      driver = 'postgres';
+      port = 5432;
+    } else if (protocol.startsWith('mongo')) {
+      driver = 'mongodb';
+      port = 27017;
+    } else if (protocol === 'redis') {
+      driver = 'redis';
+      port = 6379;
+    }
+
+    if (parsed.port) {
+      port = Number(parsed.port);
+    }
 
     return new DbForgeClient({
       mode: 'direct',
       driver,
       host: parsed.hostname,
       port,
-      username: decodeURIComponent(parsed.username),
-      password: decodeURIComponent(parsed.password),
+      username: decodeURIComponent(parsed.username || ''),
+      password: decodeURIComponent(parsed.password || ''),
       database: parsed.pathname.replace(/^\//, ''),
       ...overrides,
     });
@@ -96,21 +126,35 @@ export class DbForgeClient {
     password,
     database,
   }) {
-    if (!username || !password || !database) {
-      throw new Error('username, password, and database are required for credential connections');
+    // Redis might not have user/pass/db in some simple setups, but we'll enforce at least host/port
+    if (dbType !== 'redis' && (!username || !password || !database)) {
+      // Mongo might not strictly need all if local/no-auth, but for this framework we expect credentials usually
     }
+    
     const normalized = dbType.toLowerCase();
-    if (!SUPPORTED_SQL_DBS.includes(normalized)) {
+    if (!ALL_SUPPORTED_DBS.includes(normalized)) {
       throw new Error(`Unsupported database type: ${dbType}`);
     }
 
-    const driver = normalized.startsWith('post') ? 'postgres' : 'mysql';
+    let driver = 'mysql';
+    let defaultPort = 3306;
+
+    if (normalized.startsWith('post')) {
+      driver = 'postgres';
+      defaultPort = 5432;
+    } else if (normalized.startsWith('mongo')) {
+      driver = 'mongodb';
+      defaultPort = 27017;
+    } else if (normalized === 'redis') {
+      driver = 'redis';
+      defaultPort = 6379;
+    }
 
     return new DbForgeClient({
       mode: 'direct',
       driver,
       host,
-      port: port || (driver === 'postgres' ? 5432 : 3306),
+      port: port || defaultPort,
       username,
       password,
       database,
@@ -183,6 +227,28 @@ export class DbForgeClient {
       const PgClient = await loadPgClient();
       this.connection = new PgClient({ host, port, user: username, password, database });
       await this.connection.connect();
+    } else if (driver === 'mongodb') {
+      const MongoClient = await loadMongoClient();
+      let auth = '';
+      if (username && password) {
+        auth = `${encodeURIComponent(username)}:${encodeURIComponent(password)}@`;
+      }
+      const uri = `mongodb://${auth}${host}:${port}/${database}?authSource=admin`;
+      this.connection = new MongoClient(uri);
+      await this.connection.connect();
+    } else if (driver === 'redis') {
+      const createClient = await loadRedisClient();
+      let url = `redis://${host}:${port}`;
+      if (password) {
+        // Redis 6+ supports user:pass, older just pass
+        if (username) {
+            url = `redis://${encodeURIComponent(username)}:${encodeURIComponent(password)}@${host}:${port}`;
+        } else {
+            url = `redis://:${encodeURIComponent(password)}@${host}:${port}`;
+        }
+      }
+      this.connection = createClient({ url });
+      await this.connection.connect();
     } else {
       throw new Error(`Unsupported driver: ${driver}`);
     }
@@ -196,7 +262,15 @@ export class DbForgeClient {
     }
 
     if (this.connection) {
-      await this.connection.end();
+      if (this.driver === 'mysql') {
+        await this.connection.end();
+      } else if (this.driver === 'postgres') {
+        await this.connection.end();
+      } else if (this.driver === 'mongodb') {
+        await this.connection.close();
+      } else if (this.driver === 'redis') {
+        await this.connection.disconnect();
+      }
       this.connection = null;
     }
     this.connected = false;
@@ -245,9 +319,9 @@ export class DbForgeClient {
     }
   }
 
-  async executeDirectQuery(sql) {
+  async executeDirectQuery(query) {
     if (this.driver === 'mysql') {
-      const [rows] = await this.connection.execute(sql);
+      const [rows] = await this.connection.execute(query);
       if (Array.isArray(rows)) {
         return {
           success: true,
@@ -265,7 +339,7 @@ export class DbForgeClient {
     }
 
     if (this.driver === 'postgres') {
-      const result = await this.connection.query(sql);
+      const result = await this.connection.query(query);
       return {
         success: true,
         rows: result.rows || [],
@@ -274,10 +348,72 @@ export class DbForgeClient {
       };
     }
 
+    if (this.driver === 'mongodb') {
+      // Expect query to be an object: { collection: 'name', action: 'find', ...args }
+      if (typeof query !== 'object') {
+         throw new Error('Direct MongoDB query requires an object: { collection, action, filter, data, options }');
+      }
+      const db = this.connection.db(this.config.database);
+      const col = db.collection(query.collection);
+      
+      let result;
+      if (query.action === 'find') {
+        result = await col.find(query.filter || {}, query.options).toArray();
+        return { success: true, rows: result, rowCount: result.length };
+      } else if (query.action === 'insertOne') {
+        result = await col.insertOne(query.data);
+        return { success: true, insertedId: result.insertedId, rowCount: 1 };
+      } else if (query.action === 'updateOne') {
+        result = await col.updateOne(query.filter, { $set: query.data });
+        return { success: true, modifiedCount: result.modifiedCount, rowCount: result.modifiedCount };
+      } else if (query.action === 'deleteOne') {
+        result = await col.deleteOne(query.filter);
+        return { success: true, deletedCount: result.deletedCount, rowCount: result.deletedCount };
+      } else if (query.action === 'count') {
+        result = await col.countDocuments(query.filter || {});
+        return { success: true, count: result };
+      } else {
+         throw new Error(`Unsupported MongoDB action: ${query.action}`);
+      }
+    }
+
+    if (this.driver === 'redis') {
+      // Expect query to be a command string "SET key val" or array ["SET", "key", "val"]
+      let command, args;
+      if (Array.isArray(query)) {
+        [command, ...args] = query;
+      } else if (typeof query === 'string') {
+        [command, ...args] = query.split(' ');
+      } else {
+        throw new Error('Redis query must be a string or array');
+      }
+      
+      // Redis client v4+ uses .sendCommand or specific methods
+      try {
+         const result = await this.connection.sendCommand([command, ...args]);
+         return { success: true, result };
+      } catch(e) {
+         return { success: false, error: e.message };
+      }
+    }
+
     throw new Error('Direct query called with unknown driver');
   }
 
   async select(table, { columns = ['*'], where, limit, orderBy } = {}) {
+    if (this.driver === 'mongodb') {
+       return this.query({ 
+         collection: table, 
+         action: 'find', 
+         filter: where, 
+         options: { limit: limit || 0, sort: orderBy } // simplified sort
+       });
+    }
+    if (this.driver === 'redis') {
+       // Basic key fetch wrapper
+       return this.query(['GET', table]); // Treat 'table' as key for simple select
+    }
+
     const cols = Array.isArray(columns) ? columns.join(', ') : columns;
     let sql = `SELECT ${cols} FROM ${table}`;
     sql += buildWhereClause(where);
@@ -292,6 +428,22 @@ export class DbForgeClient {
   }
 
   async insert(table, data) {
+    if (this.driver === 'mongodb') {
+        return this.query({ collection: table, action: 'insertOne', data });
+    }
+    if (this.driver === 'redis') {
+        // data = { key: value } or just value if table is key?
+        // Let's assume table is key, data is value for simple SET
+        // Or table is hash key, data is fields
+        if (typeof data === 'object') {
+           // HSET
+           const args = ['HSET', table];
+           Object.entries(data).forEach(([k,v]) => args.push(k, String(v)));
+           return this.query(args);
+        }
+        return this.query(['SET', table, String(data)]);
+    }
+
     const entries = Object.entries(data || {}).filter(([, value]) => value !== undefined);
     if (!entries.length) {
       throw new Error('Insert requires at least one column');
@@ -303,6 +455,15 @@ export class DbForgeClient {
   }
 
   async update(table, data, where) {
+    if (this.driver === 'mongodb') {
+        return this.query({ collection: table, action: 'updateOne', filter: where, data });
+    }
+    
+    // Redis doesn't really have update vs insert in same way
+    if (this.driver === 'redis') {
+        return this.insert(table, data);
+    }
+
     const entries = Object.entries(data || {}).filter(([, value]) => value !== undefined);
     if (!entries.length) {
       throw new Error('Update requires at least one column assignment');
@@ -313,6 +474,13 @@ export class DbForgeClient {
   }
 
   async delete(table, where) {
+    if (this.driver === 'mongodb') {
+        return this.query({ collection: table, action: 'deleteOne', filter: where });
+    }
+    if (this.driver === 'redis') {
+        return this.query(['DEL', table]);
+    }
+
     const whereClause = buildWhereClause(where);
     if (!whereClause) {
       throw new Error('Delete requires a WHERE clause to avoid accidental truncation');

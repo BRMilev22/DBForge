@@ -1,0 +1,4 @@
+fastapi>=0.115.0
+uvicorn[standard]>=0.30.0
+dbforge-framework[postgres]==0.1.0
+psycopg2-binary>=2.9.9

@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DBForge MongoDB Catalog (FastAPI)</title>
+  <style>
+    :root { font-family: "Inter", system-ui, -apple-system, sans-serif; }
+    body { margin: 0; min-height: 100vh; background: linear-gradient(145deg, #0b0f1f, #0f182f); color: #f3f5ff; display: flex; align-items: center; justify-content: center; }
+    .panel { width: min(960px, 94vw); background: #0d1428; border: 1px solid #1d2a4f; border-radius: 16px; padding: 22px; box-shadow: 0 14px 60px rgba(0,0,0,0.4); }
+    h1 { margin: 0 0 8px; letter-spacing: -0.4px; }
+    p.sub { margin: 0 0 18px; color: #9fb4ff; }
+    form { display: grid; grid-template-columns: 1.2fr 0.6fr 0.8fr auto; gap: 10px; margin-bottom: 18px; }
+    input { padding: 11px 12px; border-radius: 10px; border: 1px solid #23345b; background: #0b1021; color: #f3f5ff; }
+    button { border: 1px solid #7c5dff; background: #7c5dff; color: #0c0b19; padding: 11px 15px; border-radius: 10px; cursor: pointer; font-weight: 700; transition: transform 120ms ease, box-shadow 120ms ease; }
+    button:hover { transform: translateY(-1px); box-shadow: 0 10px 26px rgba(124,93,255,0.35); }
+    .grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+    .item { padding: 14px; border-radius: 12px; background: #0a0f1f; border: 1px solid #1c2848; }
+    .item header { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+    .price { color: #7cf2c4; font-weight: 700; }
+    .tags { margin-top: 8px; display: flex; gap: 6px; flex-wrap: wrap; }
+    .tag { padding: 4px 8px; border-radius: 999px; border: 1px solid #2a3d6a; color: #9fb4ff; font-size: 12px; }
+  </style>
+</head>
+<body>
+  <div class="panel">
+    <h1>DBForge MongoDB Catalog</h1>
+    <p class="sub">FastAPI + dbforge-framework (Mongo). Add products, list them, and delete.</p>
+
+    <form id="item-form">
+      <input id="name" name="name" placeholder="Product name" required />
+      <input id="price" name="price" placeholder="Price" type="number" step="0.01" required />
+      <input id="tags" name="tags" placeholder="Tags (comma separated)" />
+      <button type="submit">Add</button>
+    </form>
+
+    <div class="grid" id="items"></div>
+  </div>
+
+  <script>
+    const listEl = document.getElementById("items");
+    const form = document.getElementById("item-form");
+
+    const render = (items) => {
+      listEl.innerHTML = "";
+      if (!items.length) {
+        listEl.innerHTML = `<div class="item">No products yet.</div>`;
+        return;
+      }
+      items.forEach((item) => {
+        const card = document.createElement("div");
+        card.className = "item";
+        card.innerHTML = `
+          <header>
+            <div>
+              <div style="font-weight:700">${item.name}</div>
+              <div class="price">$${Number(item.price).toFixed(2)}</div>
+            </div>
+            <button data-id="${item.id}" class="delete" style="background:#ff708a;border-color:#ff708a;color:#20010a;">Delete</button>
+          </header>
+          <div class="tags">
+            ${item.tags?.map((t) => `<span class="tag">${t}</span>`).join("") || "<span class='tag'>untagged</span>"}
+          </div>
+        `;
+        listEl.appendChild(card);
+      });
+    };
+
+    const fetchItems = async () => {
+      const res = await fetch("/api/items");
+      if (!res.ok) return alert("Failed to load items");
+      render(await res.json());
+    };
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const name = form.name.value.trim();
+      const price = parseFloat(form.price.value);
+      const tags = form.tags.value.split(",").map(t => t.trim()).filter(Boolean);
+      if (!name || Number.isNaN(price)) return;
+      const res = await fetch("/api/items", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, price, tags }),
+      });
+      if (!res.ok) return alert("Save failed");
+      form.reset();
+      fetchItems();
+    });
+
+    listEl.addEventListener("click", async (e) => {
+      if (e.target.classList.contains("delete")) {
+        const id = e.target.dataset.id;
+        const res = await fetch(`/api/items/${id}`, { method: "DELETE" });
+        if (!res.ok) return alert("Delete failed");
+        fetchItems();
+      }
+    });
+
+    fetchItems();
+  </script>
+</body>
+</html>

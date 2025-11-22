@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { Plus, Database, RefreshCw, AlertCircle, Play, Square, Trash2, Copy, Check, Activity, Zap, HardDrive, Clock, Settings, BarChart3, FileText, Download, Code } from 'lucide-react';
+import { Plus, Database, RefreshCw, AlertCircle, Play, Square, Trash2, Copy, Check, Activity, Zap, HardDrive, Clock, Settings, BarChart3, FileText, Download, Code, ChevronRight } from 'lucide-react';
 import { databaseApi, analyticsApi, type AnalyticsResponse } from './services/api';
 import CreateDatabaseModal from './components/CreateDatabaseModal';
 import DatabaseSelector from './components/DatabaseSelector';
@@ -9,6 +9,7 @@ import AuthModal from './components/AuthModal';
 import Landing from './components/Landing';
 import DatabaseTypeChart from './components/DatabaseTypeChart';
 import DatabaseStatusChart from './components/DatabaseStatusChart';
+import Examples from './components/Examples';
 import { useAuth } from './contexts/AuthContext';
 import type { DatabaseInstance, DatabaseType } from './types/database';
 
@@ -24,13 +25,15 @@ function App() {
   const [selectedDatabaseType, setSelectedDatabaseType] = useState<string | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [copiedField, setCopiedField] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'overview' | 'databases' | 'activity'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'databases' | 'activity' | 'examples'>('overview');
   const [toasts, setToasts] = useState<Array<{ id: number; message: string; type: 'success' | 'error' }>>([]);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [selectedDatabase, setSelectedDatabase] = useState<DatabaseInstance | null>(null);
   const [workbenchDatabase, setWorkbenchDatabase] = useState<DatabaseInstance | null>(null);
   const [dbFilter, setDbFilter] = useState<string>('all');
   const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const [frameworkInitialTab, setFrameworkInitialTab] = useState<string | undefined>(undefined);
+  const [frameworkInitialExpanded, setFrameworkInitialExpanded] = useState<string[] | undefined>(undefined);
 
   const showToast = (message: string, type: 'success' | 'error') => {
     const id = Date.now();
@@ -207,6 +210,7 @@ function App() {
       <div className="fixed bottom-0 left-1/4 w-[500px] h-[500px] bg-emerald-500/5 rounded-full blur-[120px] pointer-events-none" />
 
       {/* Sidebar Navigation */}
+      {activeTab !== 'examples' && (
       <aside className="fixed left-0 top-0 h-screen w-16 border-r border-zinc-800/50 bg-zinc-950/60 backdrop-blur-xl flex flex-col items-center py-6 gap-6 z-40">
         <div className="w-10 h-10 rounded-lg bg-gradient-to-br p-1.5 flex items-center justify-center">
           <img src="/dbforge-logo.png" alt="DBForge" className="w-full h-full object-contain" />
@@ -282,10 +286,12 @@ function App() {
           </div>
         </div>
       </aside>
+      )}
 
       {/* Main Content */}
-      <div className="ml-16 min-h-screen">
+      <div className={activeTab === 'examples' ? "ml-0 min-h-screen" : "ml-16 min-h-screen"}>
         {/* Top Header Bar */}
+        {activeTab !== 'examples' && (
         <header className="sticky top-0 z-30 border-b border-zinc-800/50 bg-zinc-950/80 backdrop-blur-xl">
           <div className="px-6 py-3.5 flex items-center justify-between">
             <div>
@@ -300,6 +306,7 @@ function App() {
             </div>
           </div>
         </header>
+        )}
 
         {error && (
           <div className="mx-6 mt-4 bg-rose-500/10 border border-rose-500/20 rounded-lg p-3 flex items-center gap-2">
@@ -451,6 +458,62 @@ function App() {
               </Card>
             )}
 
+            {/* Framework integrations */}
+            <Card title="Framework Integrations">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="p-4 rounded-lg border border-purple-500/20 bg-purple-500/5 hover:bg-purple-500/10 transition-all cursor-pointer group" onClick={() => {
+                  setFrameworkInitialTab('js-install');
+                  setFrameworkInitialExpanded(['js']);
+                  setActiveTab('examples');
+                }}>
+                  <div className="flex items-start gap-3">
+                    <div className="w-10 h-10 rounded-lg border border-purple-500/30 bg-purple-500/10 flex items-center justify-center text-xl group-hover:scale-110 transition-transform">
+                      <Code className="w-5 h-5 text-purple-400" />
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="text-sm font-semibold text-slate-200 mb-1">JavaScript/TypeScript Framework</h3>
+                      <p className="text-xs text-slate-400 mb-2">Official NPM package for Node.js and browser apps</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-zinc-800/60 text-zinc-300">Express</span>
+                        <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-zinc-800/60 text-zinc-300">Next.js</span>
+                        <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-zinc-800/60 text-zinc-300">Vue</span>
+                        <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-zinc-800/60 text-zinc-300">React</span>
+                      </div>
+                      <div className="mt-2 text-xs text-purple-400 flex items-center gap-1 group-hover:gap-2 transition-all">
+                        <span>View docs & examples</span>
+                        <ChevronRight className="w-3 h-3" />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-4 rounded-lg border border-fuchsia-500/20 bg-fuchsia-500/5 hover:bg-fuchsia-500/10 transition-all cursor-pointer group" onClick={() => {
+                  setFrameworkInitialTab('py-install');
+                  setFrameworkInitialExpanded(['python']);
+                  setActiveTab('examples');
+                }}>
+                  <div className="flex items-start gap-3">
+                    <div className="w-10 h-10 rounded-lg border border-fuchsia-500/30 bg-fuchsia-500/10 flex items-center justify-center text-xl group-hover:scale-110 transition-transform">
+                      <FileText className="w-5 h-5 text-fuchsia-400" />
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="text-sm font-semibold text-slate-200 mb-1">Python Framework</h3>
+                      <p className="text-xs text-slate-400 mb-2">Official PyPI package for Python applications</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-zinc-800/60 text-zinc-300">FastAPI</span>
+                        <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-zinc-800/60 text-zinc-300">Flask</span>
+                        <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-zinc-800/60 text-zinc-300">Django</span>
+                      </div>
+                      <div className="mt-2 text-xs text-fuchsia-400 flex items-center gap-1 group-hover:gap-2 transition-all">
+                        <span>View docs & examples</span>
+                        <ChevronRight className="w-3 h-3" />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </Card>
+
             {/* Secondary actions (no duplicates) */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               <ActionCard
@@ -462,6 +525,7 @@ function App() {
                 title="Docs & API"
                 subtitle="Endpoints and guides"
                 icon={<FileText className="w-4 h-4" />}
+                onClick={() => setActiveTab('examples')}
               />
               <ActionCard
                 title="Activity log"
@@ -472,6 +536,13 @@ function App() {
             </div>
           </main>
         )}
+
+        {/* Examples Tab */}
+        {activeTab === 'examples' && <Examples onBack={() => {
+          setActiveTab('overview');
+          setFrameworkInitialTab(undefined);
+          setFrameworkInitialExpanded(undefined);
+        }} initialTab={frameworkInitialTab} initialExpanded={frameworkInitialExpanded} />}
 
         {/* Databases Tab */}
         {activeTab === 'databases' && (

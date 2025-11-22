@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DBForge MySQL Notes (FastAPI)</title>
+  <style>
+    :root { color-scheme: light; font-family: "Inter", system-ui, -apple-system, sans-serif; }
+    body { margin: 0; background: #0b1021; color: #f3f5ff; min-height: 100vh; display: flex; align-items: center; justify-content: center; }
+    .card { width: min(960px, 92vw); background: linear-gradient(135deg, #10162f, #0d1b3d); border: 1px solid #1f2c4d; border-radius: 18px; padding: 24px; box-shadow: 0 10px 60px rgba(0, 0, 0, 0.35); }
+    h1 { margin: 0 0 12px; letter-spacing: -0.5px; }
+    p.sub { margin: 0 0 20px; color: #9fb4ff; }
+    form { display: flex; flex-direction: column; gap: 12px; margin-bottom: 20px; align-items: stretch; }
+    input, textarea { width: 100%; padding: 10px 12px; border-radius: 10px; border: 1px solid #24345a; background: #0c1327; color: #f3f5ff; }
+    textarea { resize: vertical; min-height: 120px; }
+    button { padding: 12px 16px; border-radius: 12px; border: 1px solid #3a54ff; background: #3a54ff; color: #fff; cursor: pointer; transition: transform 120ms ease, box-shadow 120ms ease; align-self: flex-start; }
+    button:hover { transform: translateY(-1px); box-shadow: 0 8px 25px rgba(58, 84, 255, 0.25); }
+    .notes { display: grid; gap: 12px; }
+    .note { padding: 14px; border-radius: 12px; background: #111a36; border: 1px solid #1f2c4d; }
+    .note header { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+    .note h3 { margin: 0; font-size: 16px; }
+    .note time { color: #8aa0e3; font-size: 13px; }
+    .note p { margin: 8px 0 0; color: #dbe3ff; white-space: pre-wrap; }
+    .empty { text-align: center; color: #7f91c7; padding: 24px; border: 1px dashed #273863; border-radius: 12px; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>DBForge MySQL Notes</h1>
+    <p class="sub">FastAPI backend + dbforge-framework. Add a note, see it stored in MySQL.</p>
+    <form id="note-form">
+      <input id="title" name="title" placeholder="Title" required />
+      <textarea id="body" name="body" placeholder="What do you want to remember?" required></textarea>
+      <button type="submit">Save</button>
+    </form>
+    <div class="notes" id="notes"></div>
+    <div class="empty" id="empty-state" hidden>No notes yet. Add your first one!</div>
+  </div>
+
+  <script>
+    const listEl = document.getElementById("notes");
+    const emptyEl = document.getElementById("empty-state");
+    const form = document.getElementById("note-form");
+
+    const renderNotes = (notes) => {
+      listEl.innerHTML = "";
+      if (!notes.length) {
+        emptyEl.hidden = false;
+        return;
+      }
+      emptyEl.hidden = true;
+
+      notes.forEach((note) => {
+        const card = document.createElement("div");
+        card.className = "note";
+        card.innerHTML = `
+          <header>
+            <div>
+              <h3>${note.title}</h3>
+              <time>${new Date(note.created_at).toLocaleString()}</time>
+            </div>
+            <button data-id="${note.id}" class="delete">Delete</button>
+          </header>
+          <p>${note.body}</p>
+        `;
+        listEl.appendChild(card);
+      });
+    };
+
+    const fetchNotes = async () => {
+      const res = await fetch("/api/notes");
+      if (!res.ok) return alert("Failed to fetch notes");
+      const data = await res.json();
+      renderNotes(data);
+    };
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const title = form.title.value.trim();
+      const body = form.body.value.trim();
+      if (!title || !body) return;
+      const res = await fetch("/api/notes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title, body }),
+      });
+      if (!res.ok) return alert("Save failed");
+      form.reset();
+      fetchNotes();
+    });
+
+    listEl.addEventListener("click", async (e) => {
+      if (e.target.classList.contains("delete")) {
+        const id = e.target.dataset.id;
+        const res = await fetch(`/api/notes/${id}`, { method: "DELETE" });
+        if (!res.ok) return alert("Delete failed");
+        fetchNotes();
+      }
+    });
+
+    fetchNotes();
+  </script>
+</body>
+</html>
