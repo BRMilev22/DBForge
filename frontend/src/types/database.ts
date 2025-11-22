@@ -23,6 +23,8 @@ export interface DatabaseInstance {
   connectionInfo: ConnectionInfo;
   apiToken?: string;
   containerId?: string;
+  storage: number;  // Disk storage in MB
+  memoryUsage: number;  // RAM usage in MB
   createdAt: string;
   startedAt?: string;
 }

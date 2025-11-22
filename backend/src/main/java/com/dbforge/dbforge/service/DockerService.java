@@ -281,6 +281,53 @@ public class DockerService {
         }
     }
     
+    public Long getContainerMemoryUsageInMB(String containerId) {
+        try {
+            // Check if container is running
+            var inspection = dockerClient.inspectContainerCmd(containerId).exec();
+            if (!Boolean.TRUE.equals(inspection.getState().getRunning())) {
+                return 0L;
+            }
+            
+            // Read memory usage from cgroup in container
+            // Execute command to read memory.usage_in_bytes
+            String[] cmd = {"/bin/sh", "-c", "cat /sys/fs/cgroup/memory/memory.usage_in_bytes 2>/dev/null || cat /sys/fs/cgroup/memory.current 2>/dev/null || echo 0"};
+            
+            var execCreateCmd = dockerClient.execCreateCmd(containerId)
+                    .withCmd(cmd)
+                    .withAttachStdout(true)
+                    .withAttachStderr(true);
+            
+            var execCreateResp = execCreateCmd.exec();
+            
+            // Capture output
+            final StringBuilder output = new StringBuilder();
+            dockerClient.execStartCmd(execCreateResp.getId())
+                    .exec(new com.github.dockerjava.api.async.ResultCallback.Adapter<com.github.dockerjava.api.model.Frame>() {
+                        @Override
+                        public void onNext(com.github.dockerjava.api.model.Frame frame) {
+                            output.append(new String(frame.getPayload()));
+                        }
+                    })
+                    .awaitCompletion(2, java.util.concurrent.TimeUnit.SECONDS);
+            
+            // Parse the result
+            String memoryStr = output.toString().trim();
+            if (!memoryStr.isEmpty() && !memoryStr.equals("0")) {
+                long memoryBytes = Long.parseLong(memoryStr);
+                long memoryMB = memoryBytes / (1024 * 1024);
+                return Math.max(1L, memoryMB); // At least 1 MB
+            }
+            
+            // Fallback: estimate based on container type
+            return 64L;
+            
+        } catch (Exception e) {
+            log.debug("Failed to get memory usage for {}: {}", containerId, e.getMessage());
+            return 64L; // Fallback to default
+        }
+    }
+    
     private Long parseMemoryLimit(String memory) {
         memory = memory.toLowerCase();
         if (memory.endsWith("g")) {

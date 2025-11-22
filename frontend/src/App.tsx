@@ -317,145 +317,201 @@ function App() {
 
         {/* Overview Tab */}
         {activeTab === 'overview' && (
-          <main className="p-6 space-y-6">
-            {/* Hero */}
-            <div className="rounded-2xl border border-zinc-800/60 bg-gradient-to-br from-[#0d0d12] via-[#0b0b10] to-[#0b0b0f] p-6 relative overflow-hidden">
-              <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_15%_20%,rgba(99,102,241,0.12),transparent_35%),radial-gradient(circle_at_85%_15%,rgba(16,185,129,0.12),transparent_30%)]" />
-              <div className="relative flex flex-col gap-3">
-                <div className="text-xs uppercase tracking-[0.2em] text-zinc-500">Control Room</div>
-                <h2 className="text-3xl font-semibold text-zinc-50">Operate every database from one cockpit</h2>
-                <p className="text-sm text-zinc-500 max-w-3xl">
-                  Launch instances, keep an eye on health, and dive into workbenches without leaving this view.
-                </p>
-                <div className="flex flex-wrap items-center gap-2">
-                  <button
-                    onClick={() => setShowDatabaseSelector(true)}
-                    className="px-4 py-2.5 rounded-lg bg-gradient-to-r from-violet-500 to-fuchsia-500 hover:from-violet-400 hover:to-fuchsia-400 text-white text-sm font-medium flex items-center gap-2 shadow-lg shadow-violet-500/25"
-                  >
-                    <Plus className="w-4 h-4" />
-                    New Database
-                  </button>
-                  <button
-                    onClick={() => setActiveTab('databases')}
-                    className="px-4 py-2.5 rounded-lg border border-zinc-800 bg-zinc-900/70 hover:bg-zinc-800/70 text-sm font-medium flex items-center gap-2"
-                  >
-                    <Database className="w-4 h-4" />
-                    Manage Instances
-                  </button>
+          <main className="p-6 space-y-5">
+            {/* Header with Actions */}
+            <div className="flex items-center justify-between">
+              <div>
+                <h1 className="text-2xl font-semibold text-zinc-100">Database Instances</h1>
+                <p className="text-sm text-zinc-500 mt-1">{databases.length} total instances • {runningDatabases} running • {totalStorage} MB storage</p>
+              </div>
+              <button
+                onClick={() => setShowDatabaseSelector(true)}
+                className="px-4 py-2 rounded-lg bg-purple-500 hover:bg-purple-600 text-white text-sm font-medium flex items-center gap-2 transition"
+              >
+                <Plus className="w-4 h-4" />
+                New Database
+              </button>
+            </div>
+
+            {/* System Overview Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div className="rounded-xl border border-zinc-800/60 bg-[#0f1014] p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-xs font-medium text-zinc-500 uppercase tracking-wide">Total Instances</span>
+                  <Database className="w-4 h-4 text-purple-400" />
+                </div>
+                <div className="text-2xl font-bold text-zinc-100">{databases.length}</div>
+                <div className="text-xs text-zinc-500 mt-1">
+                  {databaseTypes.map(dt => dt.name).join(', ')}
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-zinc-800/60 bg-[#0f1014] p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-xs font-medium text-zinc-500 uppercase tracking-wide">Running</span>
+                  <div className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_2px_rgba(16,185,129,0.4)] animate-pulse" />
+                </div>
+                <div className="text-2xl font-bold text-emerald-400">{runningDatabases}</div>
+                <div className="text-xs text-zinc-500 mt-1">
+                  {databases.filter(d => d.status === 'STOPPED').length} stopped
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-zinc-800/60 bg-[#0f1014] p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-xs font-medium text-zinc-500 uppercase tracking-wide">RAM Usage</span>
+                  <Activity className="w-4 h-4 text-amber-400" />
+                </div>
+                <div className="text-2xl font-bold text-zinc-100">
+                  {databases.reduce((sum, db) => sum + (db.memoryUsage || 0), 0)} MB
+                </div>
+                <div className="text-xs text-zinc-500 mt-1">
+                  Across running instances
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-zinc-800/60 bg-[#0f1014] p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-xs font-medium text-zinc-500 uppercase tracking-wide">Health Status</span>
+                  <Zap className="w-4 h-4 text-yellow-400" />
+                </div>
+                <div className="text-2xl font-bold text-yellow-400">
+                  {databases.length > 0 ? Math.round((runningDatabases / databases.length) * 100) : 0}%
+                </div>
+                <div className="text-xs text-zinc-500 mt-1">
+                  System operational
                 </div>
               </div>
             </div>
 
-            {/* Stats strip (unique) */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              <StatPill
-                icon={<Database className="w-4 h-4 text-violet-300" />}
-                label="Total Databases"
-                value={databases.length}
-                accent="violet"
-              />
-              <StatPill
-                icon={<Zap className="w-4 h-4 text-emerald-300" />}
-                label="Running"
-                value={runningDatabases}
-                accent="emerald"
-              />
-              <StatPill
-                icon={<Activity className="w-4 h-4 text-rose-300" />}
-                label="Stopped"
-                value={analytics?.metrics.stoppedDatabases ?? databases.filter(d => d.status === 'STOPPED').length}
-                accent="amber"
-              />
-              <StatPill
-                icon={<HardDrive className="w-4 h-4 text-sky-300" />}
-                label="Storage Used"
-                value={`${totalStorage} MB`}
-                accent="sky"
-              />
-            </div>
-
-            {/* Activity + charts */}
-            <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 items-start">
-              <Card title="Recent Activity" actionLabel="View all" onAction={() => setActiveTab('activity')}>
-                <div className="space-y-2">
-                  {analytics?.recentActivity && analytics.recentActivity.length > 0 ? (
-                    analytics.recentActivity.slice(0, 6).map((activity) => (
-                      <div key={activity.id} className="flex items-center gap-3 p-2.5 rounded-lg bg-zinc-900/60 border border-zinc-800/60">
-                        <div className={`w-1.5 h-1.5 rounded-full ${
-                          activity.status === 'RUNNING' ? 'bg-emerald-500' :
-                          activity.status === 'STOPPED' ? 'bg-zinc-500' :
-                          'bg-sky-500'
-                        }`} />
-                        <Database className="w-3.5 h-3.5 text-zinc-500" />
-                        <div className="flex-1 min-w-0">
-                          <div className="text-xs font-medium text-zinc-200 truncate">{activity.databaseName}</div>
-                          <div className="text-[11px] text-zinc-500">{activity.action} • {activity.databaseType}</div>
-                        </div>
-                        <div className="flex items-center gap-1 text-[11px] text-zinc-500">
-                          <Clock className="w-3 h-3" />
-                          {new Date(activity.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                        </div>
-                      </div>
-                    ))
-                  ) : (
-                    <div className="text-center py-8 text-zinc-500">
-                      <Activity className="w-10 h-10 mx-auto mb-2 opacity-20" />
-                      <p className="text-xs">No recent activity</p>
-                    </div>
-                  )}
-                </div>
-              </Card>
-
-              <div className="xl:col-span-2 space-y-4">
-                {analytics && (
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                    <Card title="Database Types">
-                      {analytics.databasesByType.labels.length > 0 ? (
-                        <DatabaseTypeChart 
-                          labels={analytics.databasesByType.labels}
-                          values={analytics.databasesByType.values}
-                        />
-                      ) : (
-                        <EmptyChart />
-                      )}
-                    </Card>
-
-                    <Card title="Instance Status">
-                      {analytics.databasesByStatus.labels.length > 0 ? (
-                        <DatabaseStatusChart 
-                          labels={analytics.databasesByStatus.labels}
-                          values={analytics.databasesByStatus.values}
-                        />
-                      ) : (
-                        <EmptyChart />
-                      )}
-                    </Card>
-                  </div>
-                )}
+            {/* Database Instances Table */}
+            {databases.length === 0 ? (
+              <div className="rounded-xl border border-zinc-800/60 bg-[#0f1014] p-12 text-center">
+                <Database className="w-16 h-16 text-zinc-700 mx-auto mb-4" />
+                <h3 className="text-lg font-semibold text-zinc-300 mb-2">No database instances yet</h3>
+                <p className="text-sm text-zinc-500 mb-6">Create your first database instance to get started</p>
+                <button
+                  onClick={() => setShowDatabaseSelector(true)}
+                  className="px-6 py-2.5 rounded-lg bg-purple-500 hover:bg-purple-600 text-white text-sm font-medium inline-flex items-center gap-2 transition"
+                >
+                  <Plus className="w-4 h-4" />
+                  Create Database Instance
+                </button>
               </div>
-            </div>
-
-            {/* Active DBs row */}
-            {databases.length > 0 && (
-              <Card title="Active Databases" actionLabel="Manage all" onAction={() => setActiveTab('databases')}>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {databases.filter(db => db.status === 'RUNNING').slice(0, 6).map((db) => (
-                    <div key={db.id} className="p-3 rounded-lg border border-zinc-800 bg-zinc-900/60 hover:border-emerald-500/30 transition-all group cursor-pointer">
-                      <div className="flex items-center gap-2 mb-2">
-                        <Database className="w-4 h-4 text-zinc-400" />
-                        <div className="flex-1 min-w-0">
-                          <div className="text-sm font-medium text-zinc-200 truncate">{db.instanceName}</div>
-                          <div className="text-[11px] text-zinc-500">{db.databaseType}</div>
-                        </div>
-                        <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_8px_2px_rgba(16,185,129,0.35)] animate-pulse" />
-                      </div>
-                      <div className="text-[11px] text-zinc-500 font-mono">
-                        {db.connectionInfo.host}:{db.connectionInfo.port}
-                      </div>
-                    </div>
-                  ))}
+            ) : (
+              <div className="rounded-xl border border-zinc-800/60 bg-[#0f1014] overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b border-zinc-800/60">
+                        <th className="text-left text-xs font-medium text-zinc-500 uppercase tracking-wide px-4 py-3">Instance</th>
+                        <th className="text-left text-xs font-medium text-zinc-500 uppercase tracking-wide px-4 py-3">Type</th>
+                        <th className="text-left text-xs font-medium text-zinc-500 uppercase tracking-wide px-4 py-3">Status</th>
+                        <th className="text-left text-xs font-medium text-zinc-500 uppercase tracking-wide px-4 py-3">Connection</th>
+                        <th className="text-left text-xs font-medium text-zinc-500 uppercase tracking-wide px-4 py-3">Disk</th>
+                        <th className="text-left text-xs font-medium text-zinc-500 uppercase tracking-wide px-4 py-3">RAM</th>
+                        <th className="text-left text-xs font-medium text-zinc-500 uppercase tracking-wide px-4 py-3">Created</th>
+                        <th className="text-right text-xs font-medium text-zinc-500 uppercase tracking-wide px-4 py-3">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-zinc-800/60">
+                      {databases.map((db) => (
+                        <tr key={db.id} className="hover:bg-zinc-900/40 transition">
+                          <td className="px-4 py-3">
+                            <div className="flex items-center gap-2">
+                              <Database className="w-4 h-4 text-zinc-500" />
+                              <span className="text-sm font-medium text-zinc-200">{db.instanceName}</span>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-zinc-800/60 text-zinc-300">
+                              {db.databaseType}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3">
+                            {db.status === 'RUNNING' ? (
+                              <div className="flex items-center gap-2">
+                                <div className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_6px_1px_rgba(16,185,129,0.4)]" />
+                                <span className="text-xs font-medium text-emerald-400">Running</span>
+                              </div>
+                            ) : (
+                              <div className="flex items-center gap-2">
+                                <div className="w-2 h-2 rounded-full bg-zinc-600" />
+                                <span className="text-xs font-medium text-zinc-500">Stopped</span>
+                              </div>
+                            )}
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="text-xs font-mono text-zinc-400">
+                              {db.connectionInfo.host}:{db.connectionInfo.port}
+                            </div>
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className="text-xs text-zinc-400">{db.storage} MB</span>
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className="text-xs text-zinc-400">
+                              {db.status === 'RUNNING' ? `${db.memoryUsage || 0} MB` : '-'}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className="text-xs text-zinc-500">
+                              {db.createdAt ? new Date(db.createdAt).toLocaleDateString() : 'N/A'}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="flex items-center justify-end gap-1">
+                              {db.status === 'RUNNING' ? (
+                                <>
+                                  <button
+                                    onClick={() => setWorkbenchDatabase(db)}
+                                    className="p-1.5 rounded hover:bg-purple-500/10 text-zinc-400 hover:text-purple-400 transition"
+                                    title="Open Workbench"
+                                  >
+                                    <Code className="w-4 h-4" />
+                                  </button>
+                                  <button
+                                    onClick={() => handleStopDatabase(db.id)}
+                                    disabled={isCreating}
+                                    className="p-1.5 rounded hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 transition disabled:opacity-50"
+                                    title="Stop"
+                                  >
+                                    <Square className="w-4 h-4" />
+                                  </button>
+                                </>
+                              ) : (
+                                <button
+                                  onClick={() => handleStartDatabase(db.id)}
+                                  disabled={isCreating}
+                                  className="p-1.5 rounded hover:bg-emerald-500/10 text-zinc-400 hover:text-emerald-400 transition disabled:opacity-50"
+                                  title="Start"
+                                >
+                                  <Play className="w-4 h-4" />
+                                </button>
+                              )}
+                              <button
+                                onClick={() => setSelectedDatabase(db)}
+                                className="p-1.5 rounded hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 transition"
+                                title="Details"
+                              >
+                                <Settings className="w-4 h-4" />
+                              </button>
+                              <button
+                                onClick={() => handleDeleteDatabase(db.id)}
+                                disabled={isCreating}
+                                className="p-1.5 rounded hover:bg-red-500/10 text-zinc-400 hover:text-red-400 transition disabled:opacity-50"
+                                title="Delete"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
-              </Card>
+              </div>
             )}
 
             {/* Framework integrations */}

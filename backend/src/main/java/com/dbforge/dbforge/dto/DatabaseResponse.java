@@ -5,6 +5,8 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.time.LocalDateTime;
+
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
@@ -15,6 +17,9 @@ public class DatabaseResponse {
     private String status;
     private String apiToken;
     private ConnectionInfo connectionInfo;
+    private Long storage;  // Disk storage in MB
+    private Long memoryUsage;  // RAM usage in MB
+    private LocalDateTime createdAt;
     
     @Data
     @NoArgsConstructor
@@ -45,6 +50,9 @@ public class DatabaseResponse {
         
         response.setConnectionInfo(connInfo);
         response.setApiToken(instance.getApiToken());
+        response.setStorage(instance.getStorage() != null ? instance.getStorage() : 0L);
+        response.setMemoryUsage(instance.getMemoryUsage() != null ? instance.getMemoryUsage() : 0L);
+        response.setCreatedAt(instance.getCreatedAt());
         return response;
     }
     

@@ -210,7 +210,121 @@ public class DatabaseService {
     }
     
     public List<DatabaseInstance> getUserDatabases(Long userId) {
-        return instanceRepository.findByUserIdAndStatusNot(userId, DatabaseInstance.InstanceStatus.DELETED);
+        List<DatabaseInstance> databases = instanceRepository.findByUserIdAndStatusNot(userId, DatabaseInstance.InstanceStatus.DELETED);
+        
+        // Update storage and RAM usage for all running instances
+        for (DatabaseInstance db : databases) {
+            if (db.getStatus() == DatabaseInstance.InstanceStatus.RUNNING) {
+                boolean updated = false;
+                
+                // Update disk storage
+                try {
+                    Long storageInMB = calculateDatabaseStorageInMB(db);
+                    if (storageInMB != null && !storageInMB.equals(db.getStorage())) {
+                        db.setStorage(storageInMB);
+                        updated = true;
+                    }
+                } catch (Exception e) {
+                    log.warn("Failed to update storage for instance {}: {}", db.getInstanceName(), e.getMessage());
+                }
+                
+                // Update RAM usage
+                if (db.getContainerId() != null) {
+                    try {
+                        Long memoryInMB = dockerService.getContainerMemoryUsageInMB(db.getContainerId());
+                        if (memoryInMB != null && !memoryInMB.equals(db.getMemoryUsage())) {
+                            db.setMemoryUsage(memoryInMB);
+                            updated = true;
+                        }
+                    } catch (Exception e) {
+                        log.warn("Failed to update memory usage for instance {}: {}", db.getInstanceName(), e.getMessage());
+                    }
+                }
+                
+                if (updated) {
+                    instanceRepository.save(db);
+                }
+            } else {
+                // Set RAM to 0 for stopped instances
+                if (db.getMemoryUsage() != 0L) {
+                    db.setMemoryUsage(0L);
+                    instanceRepository.save(db);
+                }
+            }
+        }
+        
+        return databases;
+    }
+    
+    private Long calculateDatabaseStorageInMB(DatabaseInstance instance) {
+        String dbType = instance.getDatabaseType().getName().toLowerCase();
+        
+        try {
+            switch (dbType) {
+                case "postgresql":
+                    return getPostgresStorageSize(instance);
+                case "mysql":
+                case "mariadb":
+                    return getMySQLStorageSize(instance);
+                case "mongodb":
+                    return getMongoDBStorageSize(instance);
+                case "redis":
+                    return getRedisStorageSize(instance);
+                default:
+                    return 10L; // Default 10 MB
+            }
+        } catch (Exception e) {
+            log.warn("Failed to calculate storage for {}: {}", instance.getInstanceName(), e.getMessage());
+            return 10L;
+        }
+    }
+    
+    private Long getPostgresStorageSize(DatabaseInstance instance) {
+        try (Connection conn = DriverManager.getConnection(
+                buildJdbcUrl(instance),
+                instance.getUsername(),
+                instance.getPassword())) {
+            
+            Statement stmt = conn.createStatement();
+            var rs = stmt.executeQuery("SELECT pg_database_size('" + instance.getDatabaseName() + "')");
+            if (rs.next()) {
+                long sizeBytes = rs.getLong(1);
+                return sizeBytes / (1024 * 1024); // Convert to MB
+            }
+        } catch (Exception e) {
+            log.debug("Could not get PostgreSQL storage size: {}", e.getMessage());
+        }
+        return 10L;
+    }
+    
+    private Long getMySQLStorageSize(DatabaseInstance instance) {
+        try (Connection conn = DriverManager.getConnection(
+                buildJdbcUrl(instance),
+                instance.getUsername(),
+                instance.getPassword())) {
+            
+            Statement stmt = conn.createStatement();
+            var rs = stmt.executeQuery(
+                "SELECT ROUND(SUM(data_length + index_length) / 1024 / 1024, 2) as size_mb " +
+                "FROM information_schema.tables WHERE table_schema = '" + instance.getDatabaseName() + "'");
+            if (rs.next()) {
+                double sizeMB = rs.getDouble(1);
+                return Math.max(1L, (long) sizeMB); // At least 1 MB
+            }
+        } catch (Exception e) {
+            log.debug("Could not get MySQL storage size: {}", e.getMessage());
+        }
+        return 10L;
+    }
+    
+    private Long getMongoDBStorageSize(DatabaseInstance instance) {
+        // MongoDB size would require MongoDB driver - return estimate for now
+        return 15L;
+    }
+    
+    private Long getRedisStorageSize(DatabaseInstance instance) {
+        // Redis size estimation - return small default
+        return 5L;
     }
     
     public DatabaseInstance getDatabaseById(Long id) {
@@ -276,6 +390,17 @@ public class DatabaseService {
             dockerService.startContainer(instance.getContainerId());
             instance.setStatus(DatabaseInstance.InstanceStatus.RUNNING);
             instance.setStartedAt(LocalDateTime.now());
+            
+            // Update database storage size
+            try {
+                Long storageInMB = calculateDatabaseStorageInMB(instance);
+                if (storageInMB != null) {
+                    instance.setStorage(storageInMB);
+                }
+            } catch (Exception e) {
+                log.warn("Failed to update storage for instance {}: {}", instance.getInstanceName(), e.getMessage());
+            }
+            
             instanceRepository.save(instance);
         }
     }

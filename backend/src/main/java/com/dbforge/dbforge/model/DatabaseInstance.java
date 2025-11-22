@@ -58,6 +58,12 @@ public class DatabaseInstance {
     
     @Column(name = "storage_limit")
     private String storageLimit = "1g";
+    
+    @Column(name = "storage")
+    private Long storage = 0L;  // Actual storage usage in MB
+    
+    @Column(name = "memory_usage")
+    private Long memoryUsage = 0L;  // RAM usage in MB
 
     @Column(name = "api_token", unique = true)
     private String apiToken;
