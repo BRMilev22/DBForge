@@ -428,8 +428,4 @@ MIT License. See LICENSE file for details.
     <strong>Developed by</strong><br/>
     <a href="https://github.com/brmilev22">brmilev22 (Boris Milev)</a> • <a href="https://github.com/vbboyanov22">vbboyanov22 (Veselin Boyanov)</a>
   </p>
-  <p>
-    <strong>Design by</strong><br/>
-    <a href="https://github.com/prpetkov22">prpetkov22 (Plamen Petkov)</a>
-  </p>
 </div>
