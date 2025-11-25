@@ -27,6 +27,20 @@ export interface AnalyticsResponse {
   }>;
 }
 
+export interface ActivityLogEntry {
+  id: number;
+  userId?: number;
+  action: string;
+  resourceType?: string;
+  resourceId?: number;
+  resourceName?: string;
+  ipAddress?: string;
+  userAgent?: string;
+  status: string;
+  details?: string;
+  createdAt: string;
+}
+
 const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
 
 const api = axios.create({
@@ -131,5 +145,38 @@ export const analyticsApi = {
   getAnalytics: async (): Promise<AnalyticsResponse> => {
     const response = await api.get('/analytics');
     return response.data;
+  },
+};
+
+export const activityApi = {
+  // Get paginated activity log with optional filters
+  getActivityLog: async (params?: {
+    action?: string;
+    resourceType?: string;
+    startDate?: string;
+    endDate?: string;
+    page?: number;
+    size?: number;
+  }): Promise<{
+    activities: ActivityLogEntry[];
+    currentPage: number;
+    totalPages: number;
+    totalItems: number;
+    hasMore: boolean;
+  }> => {
+    const response = await api.get('/activity', { params });
+    return response.data;
+  },
+
+  // Get recent activity entries
+  getRecentActivity: async (limit = 50): Promise<ActivityLogEntry[]> => {
+    const response = await api.get('/activity/recent', { params: { limit } });
+    return response.data;
+  },
+
+  // Clear the current user's activity log
+  clearActivityLog: async (): Promise<number> => {
+    const response = await api.delete('/activity');
+    return response.data?.cleared ?? 0;
   },
 };

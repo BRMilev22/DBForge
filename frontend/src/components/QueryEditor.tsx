@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import Editor from '@monaco-editor/react';
 import { Play, Loader2, Sparkles, Copy, Eraser, History } from 'lucide-react';
 import type { editor } from 'monaco-editor';
+import ConfirmDialog from './ConfirmDialog';
 
 interface QueryEditorProps {
   databaseId: number;
@@ -89,6 +90,7 @@ SET user:1:email "john@example.com"
   };
   
   const [query, setQuery] = useState(initialQuery || getDefaultQuery());
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
 
   const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
 
@@ -125,9 +127,7 @@ SET user:1:email "john@example.com"
   };
 
   const clearQuery = () => {
-    if (confirm('Clear the editor?')) {
-      setQuery('');
-    }
+    setShowClearConfirm(true);
   };
 
   const copyQuery = () => {
@@ -253,6 +253,19 @@ SET user:1:email "john@example.com"
           }}
         />
       </div>
+
+      <ConfirmDialog
+        isOpen={showClearConfirm}
+        title="Clear Editor"
+        message="Are you sure you want to clear the editor contents?"
+        confirmLabel="Clear"
+        variant="warning"
+        onConfirm={() => {
+          setQuery('');
+          setShowClearConfirm(false);
+        }}
+        onCancel={() => setShowClearConfirm(false)}
+      />
     </div>
   );
 }

@@ -1,17 +1,16 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { Plus, Database, RefreshCw, AlertCircle, Play, Square, Trash2, Copy, Check, Activity, Zap, HardDrive, Clock, Settings, BarChart3, FileText, Download, Code, ChevronRight } from 'lucide-react';
-import { databaseApi, analyticsApi, type AnalyticsResponse } from './services/api';
+import { Plus, Database, RefreshCw, AlertCircle, Play, Square, Trash2, Copy, Check, Activity, Zap, Clock, Settings, BarChart3, FileText, Download, Code, ChevronRight } from 'lucide-react';
+import { activityApi, analyticsApi, databaseApi, type AnalyticsResponse } from './services/api';
 import CreateDatabaseModal from './components/CreateDatabaseModal';
 import DatabaseSelector from './components/DatabaseSelector';
 import DatabaseDetailsModal from './components/DatabaseDetailsModal';
 import DatabaseWorkbench from './components/DatabaseWorkbench';
 import AuthModal from './components/AuthModal';
 import Landing from './components/Landing';
-import DatabaseTypeChart from './components/DatabaseTypeChart';
-import DatabaseStatusChart from './components/DatabaseStatusChart';
 import Examples from './components/Examples';
 import { useAuth } from './contexts/AuthContext';
 import type { DatabaseInstance, DatabaseType } from './types/database';
+import ConfirmDialog from './components/ConfirmDialog';
 
 function App() {
   const { user, logout } = useAuth();
@@ -25,7 +24,7 @@ function App() {
   const [selectedDatabaseType, setSelectedDatabaseType] = useState<string | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [copiedField, setCopiedField] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'overview' | 'databases' | 'activity' | 'examples'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'databases' | 'activity' | 'examples' | 'settings'>('overview');
   const [toasts, setToasts] = useState<Array<{ id: number; message: string; type: 'success' | 'error' }>>([]);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [selectedDatabase, setSelectedDatabase] = useState<DatabaseInstance | null>(null);
@@ -35,12 +34,64 @@ function App() {
   const [frameworkInitialTab, setFrameworkInitialTab] = useState<string | undefined>(undefined);
   const [frameworkInitialExpanded, setFrameworkInitialExpanded] = useState<string[] | undefined>(undefined);
 
+  // Settings state
+  const [refreshInterval, setRefreshInterval] = useState(3);
+  const [showQueryDetails, setShowQueryDetails] = useState(true);
+  const [notifyStatusChanges, setNotifyStatusChanges] = useState(true);
+  const [notifyQueryErrors, setNotifyQueryErrors] = useState(true);
+  const [notifyStorageWarnings, setNotifyStorageWarnings] = useState(false);
+  const [confirmDialog, setConfirmDialog] = useState<{
+    open: boolean;
+    title: string;
+    message: string;
+    confirmLabel?: string;
+    cancelLabel?: string;
+    variant?: 'danger' | 'warning' | 'info';
+    onConfirm?: () => void | Promise<void>;
+  }>({
+    open: false,
+    title: '',
+    message: '',
+    confirmLabel: 'Confirm',
+    cancelLabel: 'Cancel',
+    variant: 'warning',
+  });
+
   const showToast = (message: string, type: 'success' | 'error') => {
     const id = Date.now();
     setToasts(prev => [...prev, { id, message, type }]);
     setTimeout(() => {
       setToasts(prev => prev.filter(t => t.id !== id));
     }, 5000);
+  };
+
+  const openConfirmDialog = (options: {
+    title: string;
+    message: string;
+    confirmLabel?: string;
+    cancelLabel?: string;
+    variant?: 'danger' | 'warning' | 'info';
+    onConfirm: () => void | Promise<void>;
+  }) => {
+    setConfirmDialog({
+      open: true,
+      confirmLabel: 'Confirm',
+      cancelLabel: 'Cancel',
+      variant: 'warning',
+      ...options,
+    });
+  };
+
+  const closeConfirmDialog = () => {
+    setConfirmDialog(prev => ({ ...prev, open: false }));
+  };
+
+  const handleConfirmDialog = () => {
+    const action = confirmDialog.onConfirm;
+    closeConfirmDialog();
+    if (action) {
+      void action();
+    }
   };
 
   
@@ -83,6 +134,18 @@ function App() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
+
+  // Auto-refresh activity log when on activity tab
+  useEffect(() => {
+    if (activeTab === 'activity' && user) {
+      const interval = setInterval(() => {
+        loadDatabases();
+      }, refreshInterval * 1000); // Use settings refresh interval
+      
+      return () => clearInterval(interval);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, user, refreshInterval]);
 
   const handleCreateDatabase = async (databaseType: string, instanceName: string, username: string, password: string) => {
     setIsCreating(true);
@@ -127,20 +190,70 @@ function App() {
     }
   };
 
-  const handleDeleteDatabase = async (id: number) => {
-    if (!confirm('Are you sure you want to delete this database? This action cannot be undone.')) {
-      return;
-    }
-    
-    try {
-      await databaseApi.deleteDatabase(id);
-      showToast('Database deleted successfully!', 'success');
-      await loadDatabases();
-    } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : 'Failed to delete database.';
-      showToast(errorMsg, 'error');
-      console.error('Error deleting database:', err);
-    }
+  const handleDeleteDatabase = (id: number) => {
+    const target = databases.find(db => db.id === id);
+    openConfirmDialog({
+      title: 'Delete Database',
+      message: `Delete "${target?.instanceName || 'this database'}"? This action cannot be undone.`,
+      confirmLabel: 'Delete',
+      variant: 'danger',
+      onConfirm: async () => {
+        try {
+          await databaseApi.deleteDatabase(id);
+          showToast('Database deleted successfully!', 'success');
+          await loadDatabases();
+        } catch (err) {
+          const errorMsg = err instanceof Error ? err.message : 'Failed to delete database.';
+          showToast(errorMsg, 'error');
+          console.error('Error deleting database:', err);
+        }
+      },
+    });
+  };
+
+  const handleDeleteAllDatabases = () => {
+    const total = databases.length;
+    openConfirmDialog({
+      title: 'Delete All Databases',
+      message: `This will permanently delete all ${total} database${total === 1 ? '' : 's'}. This cannot be undone.`,
+      confirmLabel: 'Delete All',
+      variant: 'danger',
+      onConfirm: async () => {
+        try {
+          const deletePromises = databases.map(db => databaseApi.deleteDatabase(db.id));
+          await Promise.all(deletePromises);
+          showToast(`Successfully deleted ${total} database${total === 1 ? '' : 's'}!`, 'success');
+          await loadDatabases();
+        } catch (err) {
+          const errorMsg = err instanceof Error ? err.message : 'Failed to delete all databases.';
+          showToast(errorMsg, 'error');
+          console.error('Error deleting all databases:', err);
+        }
+      },
+    });
+  };
+
+  const handleClearActivityLog = () => {
+    openConfirmDialog({
+      title: 'Clear Activity Log',
+      message: 'This will remove all activity log entries for your account. Continue?',
+      confirmLabel: 'Clear Log',
+      variant: 'danger',
+      onConfirm: async () => {
+        try {
+          const cleared = await activityApi.clearActivityLog();
+          const message = cleared > 0
+            ? `Cleared ${cleared} activity entr${cleared === 1 ? 'y' : 'ies'}.`
+            : 'Activity log already empty.';
+          showToast(message, 'success');
+          await loadDatabases();
+        } catch (err) {
+          const errorMsg = err instanceof Error ? err.message : 'Failed to clear activity log.';
+          showToast(errorMsg, 'error');
+          console.error('Error clearing activity log:', err);
+        }
+      },
+    });
   };
 
   const copyToClipboard = (text: string, field: string) => {
@@ -197,6 +310,7 @@ function App() {
             setShowDatabaseSelector(false);
             setIsModalOpen(true);
           }}
+          onClose={() => setShowDatabaseSelector(false)}
         />
       </>
     );
@@ -256,7 +370,12 @@ function App() {
           <div className="w-8 h-px bg-zinc-800 my-2" />
 
           <button
-            className="w-10 h-10 rounded-lg flex items-center justify-center text-zinc-500 hover:text-zinc-300 hover:bg-zinc-900/50 transition-all"
+            onClick={() => setActiveTab('settings')}
+            className={`w-10 h-10 rounded-lg flex items-center justify-center transition-all ${
+              activeTab === 'settings'
+                ? 'bg-violet-500/20 text-violet-400 shadow-lg shadow-violet-500/20'
+                : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-900/50'
+            }`}
             title="Settings"
           >
             <Settings className="w-4 h-4" />
@@ -265,7 +384,7 @@ function App() {
 
         <div className="flex flex-col items-center gap-3">
           <div
-            className="relative"
+            className="relative group"
             onMouseEnter={() => setShowProfileMenu(true)}
             onMouseLeave={() => setShowProfileMenu(false)}
           >
@@ -273,7 +392,7 @@ function App() {
               {user.username.charAt(0).toUpperCase()}
             </div>
             {showProfileMenu && (
-              <div className="absolute left-full ml-2 bottom-0 w-44 p-3 bg-zinc-900 border border-zinc-800 rounded-lg shadow-xl">
+              <div className="absolute left-full ml-0.5 bottom-0 w-44 p-3 bg-zinc-900 border border-zinc-800 rounded-lg shadow-xl z-50">
                 <div className="text-xs font-medium text-zinc-200">{user.username}</div>
                 <button
                   onClick={logout}
@@ -769,36 +888,279 @@ function App() {
         {/* Activity Tab */}
         {activeTab === 'activity' && (
           <main className="p-6">
-            <div className="rounded-lg border border-zinc-800/50 bg-zinc-900/50 backdrop-blur-sm p-4">
-              <h3 className="text-sm font-semibold text-zinc-100 mb-3">Activity Log</h3>
-              <div className="space-y-2">
-                {analytics?.recentActivity && analytics.recentActivity.length > 0 ? (
-                  analytics.recentActivity.map((activity) => (
-                    <div key={activity.id} className="flex items-center gap-3 p-3 rounded-lg bg-zinc-800/30 border border-zinc-800/50 hover:bg-zinc-800/50 transition">
-                      <div className={`w-1.5 h-1.5 rounded-full ${
-                        activity.status === 'RUNNING' ? 'bg-emerald-500' :
-                        activity.status === 'STOPPED' ? 'bg-zinc-500' :
-                        'bg-sky-500'
-                      }`} />
-                      <div className="w-8 h-8 rounded-lg bg-zinc-700/50 flex items-center justify-center">
-                        <Database className="w-4 h-4 text-zinc-400" />
+            <div className="rounded-lg border border-zinc-800/50 bg-zinc-900/50 backdrop-blur-sm p-6">
+              <div className="flex items-center justify-between mb-4">
+                <p className="text-xs text-zinc-500">Auto-refreshing every {refreshInterval} second{refreshInterval !== 1 ? 's' : ''}</p>
+                <button
+                  onClick={() => loadDatabases()}
+                  className="flex items-center gap-2 px-3 py-1.5 text-xs bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-lg transition-colors"
+                >
+                  <RefreshCw className="w-3.5 h-3.5" />
+                  Refresh Now
+                </button>
+              </div>
+              {analytics?.recentActivity && analytics.recentActivity.length > 0 ? (
+                <div className="space-y-3">
+                  {analytics.recentActivity.map((activity, idx) => {
+                    const isSuccess = activity.status === 'SUCCESS';
+                    const isCreate = activity.action.includes('Created');
+                    const isDelete = activity.action.includes('Deleted');
+                    const isStart = activity.action.includes('Started');
+                    const isStop = activity.action.includes('Stopped');
+                    
+                    return (
+                      <div key={activity.id} className="group relative flex items-start gap-4 p-4 rounded-lg bg-zinc-800/30 border border-zinc-800/50 hover:border-zinc-700 hover:bg-zinc-800/40 transition-all">
+                        {/* Timeline connector */}
+                        {idx < analytics.recentActivity.length - 1 && (
+                          <div className="absolute left-6 top-14 bottom-0 w-px bg-zinc-800" />
+                        )}
+                        
+                        {/* Icon */}
+                        <div className={`relative z-10 w-10 h-10 rounded-lg flex items-center justify-center ${
+                          isCreate ? 'bg-emerald-500/10 text-emerald-400 ring-1 ring-emerald-500/20' :
+                          isDelete ? 'bg-rose-500/10 text-rose-400 ring-1 ring-rose-500/20' :
+                          isStart ? 'bg-sky-500/10 text-sky-400 ring-1 ring-sky-500/20' :
+                          isStop ? 'bg-amber-500/10 text-amber-400 ring-1 ring-amber-500/20' :
+                          'bg-violet-500/10 text-violet-400 ring-1 ring-violet-500/20'
+                        }`}>
+                          {isCreate && <Plus className="w-5 h-5" />}
+                          {isDelete && <Trash2 className="w-5 h-5" />}
+                          {isStart && <Play className="w-5 h-5" />}
+                          {isStop && <Square className="w-5 h-5" />}
+                          {!isCreate && !isDelete && !isStart && !isStop && <Activity className="w-5 h-5" />}
+                        </div>
+                        
+                        {/* Content */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-start justify-between gap-3 mb-1">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-1">
+                                <span className="text-sm font-semibold text-zinc-100">{activity.action}</span>
+                                <span className={`px-2 py-0.5 rounded text-[10px] font-medium ${
+                                  isSuccess ? 'bg-emerald-500/10 text-emerald-400' : 'bg-rose-500/10 text-rose-400'
+                                }`}>
+                                  {activity.status}
+                                </span>
+                              </div>
+                              <div className="text-sm text-zinc-400">
+                                <span className="font-mono text-violet-400">{activity.databaseName}</span>
+                                <span className="text-zinc-600 mx-2">•</span>
+                                <span className="text-zinc-500">{activity.databaseType}</span>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-1.5 text-xs text-zinc-500 shrink-0">
+                              <Clock className="w-3.5 h-3.5" />
+                              {new Date(activity.timestamp).toLocaleString('en-US', {
+                                month: 'short',
+                                day: 'numeric',
+                                hour: '2-digit',
+                                minute: '2-digit'
+                              })}
+                            </div>
+                          </div>
+                        </div>
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="text-sm font-medium text-zinc-200">{activity.databaseName}</div>
-                        <div className="text-xs text-zinc-500">{activity.action} • {activity.databaseType}</div>
-                      </div>
-                      <div className="flex items-center gap-1.5 text-xs text-zinc-500">
-                        <Clock className="w-3.5 h-3.5" />
-                        {new Date(activity.timestamp).toLocaleString()}
-                      </div>
-                    </div>
-                  ))
-                ) : (
-                  <div className="text-center py-12">
-                    <Activity className="w-12 h-12 text-zinc-700 mx-auto mb-3 opacity-40" />
-                    <p className="text-sm text-zinc-500">No activity to display</p>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="text-center py-16">
+                  <div className="w-16 h-16 rounded-full bg-zinc-800/50 flex items-center justify-center mx-auto mb-4">
+                    <Activity className="w-8 h-8 text-zinc-600" />
                   </div>
-                )}
+                  <p className="text-sm font-medium text-zinc-400 mb-1">No activity yet</p>
+                  <p className="text-xs text-zinc-600">Create a database to see activity</p>
+                </div>
+              )}
+            </div>
+          </main>
+        )}
+
+        {/* Settings Tab */}
+        {activeTab === 'settings' && (
+          <main className="p-6">
+            <div className="max-w-4xl">
+              <h1 className="text-3xl font-bold mb-2">Settings</h1>
+              <p className="text-sm text-zinc-400 mb-8">Manage your preferences and account settings</p>
+
+              <div className="space-y-6">
+                {/* User Profile Section */}
+                <div className="rounded-lg border border-zinc-800/50 bg-zinc-900/50 backdrop-blur-sm p-6">
+                  <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-full bg-violet-500/20 flex items-center justify-center">
+                      <span className="text-sm font-medium text-violet-400">{user.username.charAt(0).toUpperCase()}</span>
+                    </div>
+                    User Profile
+                  </h2>
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-xs font-medium text-zinc-400 mb-1.5">Username</label>
+                      <input
+                        type="text"
+                        value={user.username}
+                        disabled
+                        className="w-full px-3 py-2 bg-zinc-800/50 border border-zinc-700 rounded-lg text-sm text-zinc-300 cursor-not-allowed"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-zinc-400 mb-1.5">Email</label>
+                      <input
+                        type="email"
+                        value={user.email}
+                        disabled
+                        className="w-full px-3 py-2 bg-zinc-800/50 border border-zinc-700 rounded-lg text-sm text-zinc-300 cursor-not-allowed"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Activity Log Settings */}
+                <div className="rounded-lg border border-zinc-800/50 bg-zinc-900/50 backdrop-blur-sm p-6">
+                  <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                    <Activity className="w-5 h-5 text-violet-400" />
+                    Activity Log
+                  </h2>
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-xs font-medium text-zinc-400 mb-1.5">Auto-refresh Interval</label>
+                      <div className="flex items-center gap-3">
+                        <input
+                          type="range"
+                          min="1"
+                          max="10"
+                          value={refreshInterval}
+                          onChange={(e) => setRefreshInterval(Number(e.target.value))}
+                          className="flex-1"
+                        />
+                        <span className="text-sm text-zinc-300 min-w-[80px]">{refreshInterval} second{refreshInterval !== 1 ? 's' : ''}</span>
+                      </div>
+                      <p className="text-xs text-zinc-500 mt-1">How often the activity log refreshes when viewing the Activity tab</p>
+                    </div>
+                    <div className="flex items-center justify-between p-3 bg-zinc-800/30 rounded-lg">
+                      <div>
+                        <p className="text-sm font-medium text-zinc-300">Show Query Details</p>
+                        <p className="text-xs text-zinc-500 mt-0.5">Display full query text in activity entries</p>
+                      </div>
+                      <label className="relative inline-flex items-center cursor-pointer">
+                        <input 
+                          type="checkbox" 
+                          checked={showQueryDetails}
+                          onChange={(e) => setShowQueryDetails(e.target.checked)}
+                          className="sr-only peer" 
+                        />
+                        <div className="w-11 h-6 bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-violet-500"></div>
+                      </label>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Notifications */}
+                <div className="rounded-lg border border-zinc-800/50 bg-zinc-900/50 backdrop-blur-sm p-6">
+                  <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                    <AlertCircle className="w-5 h-5 text-violet-400" />
+                    Notifications
+                  </h2>
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between p-3 bg-zinc-800/30 rounded-lg">
+                      <div>
+                        <p className="text-sm font-medium text-zinc-300">Database Status Changes</p>
+                        <p className="text-xs text-zinc-500 mt-0.5">Notify when databases start or stop</p>
+                      </div>
+                      <label className="relative inline-flex items-center cursor-pointer">
+                        <input 
+                          type="checkbox" 
+                          checked={notifyStatusChanges}
+                          onChange={(e) => setNotifyStatusChanges(e.target.checked)}
+                          className="sr-only peer" 
+                        />
+                        <div className="w-11 h-6 bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-violet-500"></div>
+                      </label>
+                    </div>
+                    <div className="flex items-center justify-between p-3 bg-zinc-800/30 rounded-lg">
+                      <div>
+                        <p className="text-sm font-medium text-zinc-300">Query Errors</p>
+                        <p className="text-xs text-zinc-500 mt-0.5">Show notifications for failed queries</p>
+                      </div>
+                      <label className="relative inline-flex items-center cursor-pointer">
+                        <input 
+                          type="checkbox" 
+                          checked={notifyQueryErrors}
+                          onChange={(e) => setNotifyQueryErrors(e.target.checked)}
+                          className="sr-only peer" 
+                        />
+                        <div className="w-11 h-6 bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-violet-500"></div>
+                      </label>
+                    </div>
+                    <div className="flex items-center justify-between p-3 bg-zinc-800/30 rounded-lg">
+                      <div>
+                        <p className="text-sm font-medium text-zinc-300">Storage Warnings</p>
+                        <p className="text-xs text-zinc-500 mt-0.5">Alert when storage usage exceeds threshold</p>
+                      </div>
+                      <label className="relative inline-flex items-center cursor-pointer">
+                        <input 
+                          type="checkbox" 
+                          checked={notifyStorageWarnings}
+                          onChange={(e) => setNotifyStorageWarnings(e.target.checked)}
+                          className="sr-only peer" 
+                        />
+                        <div className="w-11 h-6 bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-violet-500"></div>
+                      </label>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Danger Zone */}
+                <div className="rounded-lg border border-rose-900/50 bg-rose-950/20 backdrop-blur-sm p-6">
+                  <h2 className="text-lg font-semibold mb-4 text-rose-400 flex items-center gap-2">
+                    <AlertCircle className="w-5 h-5" />
+                    Danger Zone
+                  </h2>
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between p-4 bg-zinc-900/50 rounded-lg border border-zinc-800">
+                      <div>
+                        <p className="text-sm font-medium text-zinc-300">Delete All Databases</p>
+                        <p className="text-xs text-zinc-500 mt-0.5">Permanently delete all database instances</p>
+                      </div>
+                      <button 
+                        onClick={handleDeleteAllDatabases}
+                        disabled={databases.length === 0}
+                        className="px-4 py-2 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 text-rose-400 rounded-lg text-sm font-medium transition disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        Delete All {databases.length > 0 && `(${databases.length})`}
+                      </button>
+                    </div>
+                    <div className="flex items-center justify-between p-4 bg-zinc-900/50 rounded-lg border border-zinc-800">
+                      <div>
+                        <p className="text-sm font-medium text-zinc-300">Clear Activity Log</p>
+                        <p className="text-xs text-zinc-500 mt-0.5">Remove all activity log entries</p>
+                      </div>
+                      <button 
+                        onClick={handleClearActivityLog}
+                        className="px-4 py-2 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 text-rose-400 rounded-lg text-sm font-medium transition"
+                      >
+                        Clear Log
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Save Button */}
+                <div className="flex justify-end gap-3 pt-4 border-t border-zinc-800">
+                  <button
+                    onClick={() => setActiveTab('overview')}
+                    className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-lg text-sm font-medium transition"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => {
+                      showToast('Settings saved successfully!', 'success');
+                    }}
+                    className="px-4 py-2 bg-violet-500 hover:bg-violet-600 text-white rounded-lg text-sm font-medium transition"
+                  >
+                    Save Changes
+                  </button>
+                </div>
               </div>
             </div>
           </main>
@@ -817,6 +1179,17 @@ function App() {
         databaseTypes={databaseTypes}
         isCreating={isCreating}
         preselectedType={selectedDatabaseType}
+      />
+
+      <ConfirmDialog
+        isOpen={confirmDialog.open}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        confirmLabel={confirmDialog.confirmLabel}
+        cancelLabel={confirmDialog.cancelLabel}
+        variant={confirmDialog.variant}
+        onConfirm={handleConfirmDialog}
+        onCancel={closeConfirmDialog}
       />
 
       <div className="fixed bottom-4 right-4 z-50 space-y-2">

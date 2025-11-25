@@ -217,6 +217,7 @@ public class DockerService {
         
         switch (dbType.getName().toLowerCase()) {
             case "postgresql":
+            case "postgres":
                 env.add("POSTGRES_DB=" + instance.getDatabaseName());
                 env.add("POSTGRES_USER=" + instance.getUsername());
                 env.add("POSTGRES_PASSWORD=" + instance.getPassword());
@@ -325,6 +326,35 @@ public class DockerService {
         } catch (Exception e) {
             log.debug("Failed to get memory usage for {}: {}", containerId, e.getMessage());
             return 64L; // Fallback to default
+        }
+    }
+    
+    public long getContainerSize(String containerId) {
+        try {
+            // Use docker ps with size=true to get accurate container size
+            var containers = dockerClient.listContainersCmd()
+                    .withShowAll(true)
+                    .withShowSize(true)
+                    .withIdFilter(List.of(containerId))
+                    .exec();
+            
+            if (containers.isEmpty()) {
+                return 0L;
+            }
+            
+            // Get the container's size (read-write layer size)
+            Long sizeRw = containers.get(0).getSizeRw();
+            
+            if (sizeRw != null && sizeRw > 0) {
+                return sizeRw / (1024 * 1024); // Convert bytes to MB
+            }
+            
+            // Fallback: minimal estimate
+            return 1L; // 1 MB minimum
+            
+        } catch (Exception e) {
+            log.debug("Failed to get container size for {}: {}", containerId, e.getMessage());
+            return 1L; // Fallback to 1 MB
         }
     }
     

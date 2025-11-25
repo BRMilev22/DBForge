@@ -18,8 +18,15 @@ import java.util.*;
 @Service
 @Slf4j
 public class MongoDBQueryService {
+    
+    private final AuditLogService auditLogService;
+    
+    public MongoDBQueryService(AuditLogService auditLogService) {
+        this.auditLogService = auditLogService;
+    }
 
     public QueryResult executeMongoQuery(DatabaseInstance instance, QueryRequest request) {
+        Long userId = instance.getUserId();
         long startTime = System.currentTimeMillis();
         
         // Use localhost since backend runs on same server as Docker containers
@@ -54,7 +61,20 @@ public class MongoDBQueryService {
             
             // Simple query parsing - real implementation would need a proper parser
             if (normalizedQuery.startsWith("db.") || normalizedQuery.startsWith("use ")) {
-                return executeMongoCommand(database, normalizedQuery, request.getLimit());
+                QueryResult result = executeMongoCommand(database, normalizedQuery, request.getLimit());
+                
+                // Log successful query
+                if (result.getSuccess() != null && result.getSuccess()) {
+                    String queryType = determineMongoQueryType(normalizedQuery);
+                    String action = getActionForMongoQuery(queryType);
+                    String queryPreview = normalizedQuery.length() > 100 ? normalizedQuery.substring(0, 100) + "..." : normalizedQuery;
+                    String details = String.format("MongoDB %s, Execution time: %dms, Query: %s", 
+                            queryType, result.getExecutionTimeMs(), queryPreview);
+                    auditLogService.logSuccess(userId, action, "DATABASE", instance.getId(),
+                            instance.getInstanceName(), details);
+                }
+                
+                return result;
             } else {
                 return QueryResult.builder()
                     .success(false)
@@ -65,6 +85,11 @@ public class MongoDBQueryService {
         } catch (Exception e) {
             log.error("MongoDB query execution error: {}", e.getMessage());
             long executionTime = System.currentTimeMillis() - startTime;
+            
+            // Log failed query
+            auditLogService.logFailure(userId, "QUERY_EXECUTED", "DATABASE", instance.getId(),
+                    instance.getInstanceName(), "MongoDB query failed: " + e.getMessage());
+            
             return QueryResult.builder()
                 .success(false)
                 .error(e.getMessage())
@@ -495,5 +520,28 @@ public class MongoDBQueryService {
             log.error("Failed to get MongoDB collections: {}", e.getMessage());
             return new ArrayList<>();
         }
+    }
+    
+    private String determineMongoQueryType(String query) {
+        String lower = query.toLowerCase();
+        if (lower.contains(".find(") || lower.contains(".findone(")) return "FIND";
+        if (lower.contains(".insertone(") || lower.contains(".insertmany(")) return "INSERT";
+        if (lower.contains(".updateone(") || lower.contains(".updatemany(") || lower.contains(".replaceone(")) return "UPDATE";
+        if (lower.contains(".deleteone(") || lower.contains(".deletemany(")) return "DELETE";
+        if (lower.contains(".drop(")) return "DROP";
+        if (lower.contains(".createindex(")) return "CREATE_INDEX";
+        return "OTHER";
+    }
+    
+    private String getActionForMongoQuery(String queryType) {
+        return switch (queryType) {
+            case "FIND" -> "QUERY_EXECUTED";
+            case "INSERT" -> "DATA_INSERTED";
+            case "UPDATE" -> "DATA_UPDATED";
+            case "DELETE" -> "DATA_DELETED";
+            case "DROP" -> "SCHEMA_DROPPED";
+            case "CREATE_INDEX" -> "SCHEMA_CREATED";
+            default -> "QUERY_EXECUTED";
+        };
     }
 }

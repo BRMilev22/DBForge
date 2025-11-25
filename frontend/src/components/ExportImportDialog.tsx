@@ -26,6 +26,7 @@ export default function ExportImportDialog({
     limit: 0
   });
   const [loading, setLoading] = useState(false);
+  const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error' | 'info'; text: string } | null>(null);
 
   if (!isOpen) return null;
 
@@ -33,7 +34,7 @@ export default function ExportImportDialog({
     setLoading(true);
     try {
       if (!tableName) {
-        alert('No table selected');
+        setStatusMessage({ type: 'error', text: 'No table selected' });
         return;
       }
 
@@ -42,7 +43,7 @@ export default function ExportImportDialog({
       const result = await onExecuteQuery(`SELECT * FROM ${tableName}${limitClause}`);
 
       if (!result.success) {
-        alert('Failed to fetch data');
+        setStatusMessage({ type: 'error', text: 'Failed to fetch data' });
         return;
       }
 
@@ -75,9 +76,13 @@ export default function ExportImportDialog({
       a.click();
       URL.revokeObjectURL(url);
 
+      setStatusMessage({ type: 'success', text: 'Export generated and download started.' });
       onClose();
     } catch (err) {
-      alert('Export failed: ' + (err instanceof Error ? err.message : 'Unknown error'));
+      setStatusMessage({
+        type: 'error',
+        text: 'Export failed: ' + (err instanceof Error ? err.message : 'Unknown error'),
+      });
     } finally {
       setLoading(false);
     }
@@ -159,10 +164,13 @@ export default function ExportImportDialog({
         }
       }
       
-      alert('Import completed successfully!');
+      setStatusMessage({ type: 'success', text: 'Import completed successfully!' });
       onClose();
     } catch (err) {
-      alert('Import failed: ' + (err instanceof Error ? err.message : 'Unknown error'));
+      setStatusMessage({
+        type: 'error',
+        text: 'Import failed: ' + (err instanceof Error ? err.message : 'Unknown error'),
+      });
     } finally {
       setLoading(false);
     }
@@ -193,6 +201,19 @@ export default function ExportImportDialog({
 
         {/* Content */}
         <div className="p-6 space-y-4">
+          {statusMessage && (
+            <div
+              className={`p-3 rounded border text-sm ${
+                statusMessage.type === 'success'
+                  ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-300'
+                  : statusMessage.type === 'info'
+                  ? 'bg-sky-500/10 border-sky-500/20 text-sky-200'
+                  : 'bg-rose-500/10 border-rose-500/20 text-rose-300'
+              }`}
+            >
+              {statusMessage.text}
+            </div>
+          )}
           {tableName && (
             <div>
               <div className="text-sm text-zinc-500 mb-1">Table</div>

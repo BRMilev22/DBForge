@@ -16,6 +16,7 @@ public class DatabaseResponse {
     private String databaseType;
     private String status;
     private String apiToken;
+    private String containerId;
     private ConnectionInfo connectionInfo;
     private Long storage;  // Disk storage in MB
     private Long memoryUsage;  // RAM usage in MB
@@ -39,6 +40,7 @@ public class DatabaseResponse {
         response.setInstanceName(instance.getInstanceName());
         response.setDatabaseType(instance.getDatabaseType().getName());
         response.setStatus(instance.getStatus().name());
+        response.setContainerId(instance.getContainerId());
         
         ConnectionInfo connInfo = new ConnectionInfo();
         connInfo.setHost(instance.getHost());
@@ -59,7 +61,7 @@ public class DatabaseResponse {
     private static String buildConnectionString(DatabaseInstance instance) {
         String dbType = instance.getDatabaseType().getName().toLowerCase();
         return switch (dbType) {
-            case "postgresql" -> String.format("postgresql://%s:%s@%s:%d/%s",
+            case "postgresql" -> String.format("postgres://%s:%s@%s:%d/%s",
                     instance.getUsername(), instance.getPassword(),
                     instance.getHost(), instance.getPort(), instance.getDatabaseName());
             case "mysql", "mariadb" -> String.format("mysql://%s:%s@%s:%d/%s",

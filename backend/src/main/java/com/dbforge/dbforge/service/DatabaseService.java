@@ -31,6 +31,7 @@ public class DatabaseService {
     private final DatabaseVersionRepository versionRepository;
     private final DockerService dockerService;
     private final ApiTokenService apiTokenService;
+    private final AuditLogService auditLogService;
     
     @Value("${app.database.host:localhost}")
     private String databaseHost;
@@ -137,7 +138,30 @@ public class DatabaseService {
             // Initialize with default schema
             initializeDefaultSchema(instance);
             
+            // Calculate initial storage and memory usage
+            try {
+                Long storageInMB = calculateDatabaseStorageInMB(instance);
+                if (storageInMB != null) {
+                    instance.setStorage(storageInMB);
+                }
+            } catch (Exception e) {
+                log.warn("Failed to calculate initial storage for {}: {}", instanceName, e.getMessage());
+            }
+            
+            try {
+                Long memoryInMB = dockerService.getContainerMemoryUsageInMB(containerId);
+                if (memoryInMB != null) {
+                    instance.setMemoryUsage(memoryInMB);
+                }
+            } catch (Exception e) {
+                log.warn("Failed to calculate initial memory usage for {}: {}", instanceName, e.getMessage());
+            }
+            
             log.info("Database created successfully: {} (user: {})", instanceName, userId);
+            
+            // Log audit event
+            auditLogService.logSuccess(userId, "DATABASE_CREATED", "DATABASE", instance.getId(), 
+                    instanceName, "Database type: " + databaseTypeName + ", Port: " + port);
             
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
@@ -147,6 +171,8 @@ public class DatabaseService {
         } catch (Exception e) {
             log.error("Failed to create database container", e);
             instance.setStatus(DatabaseInstance.InstanceStatus.ERROR);
+            auditLogService.logFailure(userId, "DATABASE_CREATED", "DATABASE", instance.getId(), 
+                    instanceName, e.getMessage());
             throw new RuntimeException("Failed to create database: " + e.getMessage());
         }
         
@@ -360,6 +386,9 @@ public class DatabaseService {
         instance.setStatus(DatabaseInstance.InstanceStatus.DELETED);
         instanceRepository.save(instance);
         
+        auditLogService.logSuccess(userId, "DATABASE_DELETED", "DATABASE", instance.getId(), 
+                instance.getInstanceName());
+        
         log.info("Database deleted: {} (user: {})", instance.getInstanceName(), userId);
     }
     
@@ -375,6 +404,9 @@ public class DatabaseService {
             dockerService.stopContainer(instance.getContainerId());
             instance.setStatus(DatabaseInstance.InstanceStatus.STOPPED);
             instanceRepository.save(instance);
+            
+            auditLogService.logSuccess(userId, "DATABASE_STOPPED", "DATABASE", instance.getId(), 
+                    instance.getInstanceName());
         }
     }
     
@@ -402,6 +434,9 @@ public class DatabaseService {
             }
             
             instanceRepository.save(instance);
+            
+            auditLogService.logSuccess(userId, "DATABASE_STARTED", "DATABASE", instance.getId(), 
+                    instance.getInstanceName());
         }
     }
 
@@ -458,7 +493,7 @@ public class DatabaseService {
     
     private int getStartPort(String dbTypeName) {
         return switch (dbTypeName.toLowerCase()) {
-            case "postgresql" -> postgresStart;
+            case "postgresql", "postgres" -> postgresStart;
             case "mysql" -> mysqlStart;
             case "mariadb" -> mariadbStart;
             case "mongodb" -> mongodbStart;
@@ -469,7 +504,7 @@ public class DatabaseService {
     
     private int getEndPort(String dbTypeName) {
         return switch (dbTypeName.toLowerCase()) {
-            case "postgresql" -> postgresEnd;
+            case "postgresql", "postgres" -> postgresEnd;
             case "mysql" -> mysqlEnd;
             case "mariadb" -> mariadbEnd;
             case "mongodb" -> mongodbEnd;

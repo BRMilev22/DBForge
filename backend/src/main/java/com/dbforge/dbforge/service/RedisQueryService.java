@@ -14,8 +14,15 @@ import java.util.*;
 @Service
 @Slf4j
 public class RedisQueryService {
+    
+    private final AuditLogService auditLogService;
+    
+    public RedisQueryService(AuditLogService auditLogService) {
+        this.auditLogService = auditLogService;
+    }
 
     public QueryResult executeRedisCommand(DatabaseInstance instance, QueryRequest request) {
+        Long userId = instance.getUserId();
         long startTime = System.currentTimeMillis();
         
         JedisPoolConfig poolConfig = new JedisPoolConfig();
@@ -49,7 +56,8 @@ public class RedisQueryService {
                     .build();
             }
             
-            // If multiple commands, execute them all and return summary
+            // Execute commands
+            QueryResult result;
             if (commands.size() > 1) {
                 int successCount = 0;
                 int errorCount = 0;
@@ -57,12 +65,12 @@ public class RedisQueryService {
                 
                 for (String cmd : commands) {
                     try {
-                        QueryResult result = executeSingleCommand(jedis, cmd, startTime);
-                        if (result.getSuccess() != null && result.getSuccess()) {
+                        QueryResult cmdResult = executeSingleCommand(jedis, cmd, startTime);
+                        if (cmdResult.getSuccess() != null && cmdResult.getSuccess()) {
                             successCount++;
                         } else {
                             errorCount++;
-                            lastError = result.getError();
+                            lastError = cmdResult.getError();
                         }
                     } catch (Exception e) {
                         errorCount++;
@@ -71,12 +79,18 @@ public class RedisQueryService {
                 }
                 
                 if (errorCount > 0) {
+                    auditLogService.logFailure(userId, "QUERY_EXECUTED", "DATABASE", instance.getId(),
+                            instance.getInstanceName(), "Redis: " + errorCount + " commands failed");
                     return QueryResult.builder()
                         .success(false)
                         .error(String.format("Executed %d commands: %d succeeded, %d failed. Last error: %s", 
                             commands.size(), successCount, errorCount, lastError))
                         .executionTimeMs(System.currentTimeMillis() - startTime)
                         .build();
+                } else {
+                    String details = String.format("Redis: %d commands executed successfully", successCount);
+                    auditLogService.logSuccess(userId, "QUERY_EXECUTED", "DATABASE", instance.getId(),
+                            instance.getInstanceName(), details);
                 }
                 
                 return QueryResult.builder()
@@ -88,11 +102,25 @@ public class RedisQueryService {
             }
             
             // Single command
-            return executeSingleCommand(jedis, commands.get(0), startTime);
+            result = executeSingleCommand(jedis, commands.get(0), startTime);
+            
+            // Log single command execution
+            if (result.getSuccess() != null && result.getSuccess()) {
+                String cmdPreview = commands.get(0).length() > 100 ? commands.get(0).substring(0, 100) + "..." : commands.get(0);
+                String details = String.format("Redis: %s, Execution time: %dms", cmdPreview, result.getExecutionTimeMs());
+                auditLogService.logSuccess(userId, "QUERY_EXECUTED", "DATABASE", instance.getId(),
+                        instance.getInstanceName(), details);
+            }
+            
+            return result;
             
         } catch (Exception e) {
             log.error("Redis command execution error: {}", e.getMessage());
             long executionTime = System.currentTimeMillis() - startTime;
+            
+            auditLogService.logFailure(userId, "QUERY_EXECUTED", "DATABASE", instance.getId(),
+                    instance.getInstanceName(), "Redis command failed: " + e.getMessage());
+            
             return QueryResult.builder()
                 .success(false)
                 .error(e.getMessage())

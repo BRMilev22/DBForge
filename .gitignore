@@ -38,6 +38,14 @@ framework/node_modules
 logs/
 *.log
 
+# Process ID files
+*.pid
+backend-production.pid
+
+# Nginx configuration (server-specific)
+nginx*.conf
+*nginx*.conf
+
 # Passwords and secrets
 *password*.txt
 *secret*.txt

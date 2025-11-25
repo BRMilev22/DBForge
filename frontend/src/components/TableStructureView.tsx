@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Plus, Trash2, Save, Key, Link as LinkIcon, Zap } from 'lucide-react';
+import ConfirmDialog from './ConfirmDialog';
 
 interface Column {
   name: string;
@@ -45,6 +46,8 @@ export default function TableStructureView({
   const [indexes, setIndexes] = useState<Index[]>([]);
   const [_foreignKeys, _setForeignKeys] = useState<ForeignKey[]>([]);
   const [loading, setLoading] = useState(false);
+  const [confirmDeleteIndex, setConfirmDeleteIndex] = useState<number | null>(null);
+  const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   useEffect(() => {
     loadStructure();
@@ -72,8 +75,7 @@ export default function TableStructureView({
   };
 
   const deleteColumn = (index: number) => {
-    if (!confirm(`Delete column "${columns[index].name}"?`)) return;
-    setColumns(columns.filter((_, i) => i !== index));
+    setConfirmDeleteIndex(index);
   };
 
   const updateColumn = (index: number, field: keyof Column, value: any) => {
@@ -88,10 +90,15 @@ export default function TableStructureView({
       // Generate ALTER TABLE statements
       // This is simplified - real implementation would need to track changes
       // and generate appropriate ADD COLUMN, MODIFY COLUMN, DROP COLUMN statements
-      
-      alert('Structure changes saved! (Full ALTER TABLE generation not yet implemented)');
+      setStatusMessage({
+        type: 'success',
+        text: 'Structure changes saved! (Full ALTER TABLE generation not yet implemented)',
+      });
     } catch (err) {
-      alert('Failed to save: ' + (err instanceof Error ? err.message : 'Unknown error'));
+      setStatusMessage({
+        type: 'error',
+        text: 'Failed to save: ' + (err instanceof Error ? err.message : 'Unknown error'),
+      });
     } finally {
       setLoading(false);
     }
@@ -149,6 +156,17 @@ export default function TableStructureView({
 
       {/* Content */}
       <div className="flex-1 overflow-auto p-4">
+        {statusMessage && (
+          <div
+            className={`mb-3 px-3 py-2 rounded border text-sm ${
+              statusMessage.type === 'success'
+                ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-300'
+                : 'bg-rose-500/10 border-rose-500/20 text-rose-300'
+            }`}
+          >
+            {statusMessage.text}
+          </div>
+        )}
         {activeTab === 'columns' && (
           <div>
             <div className="mb-4">
@@ -282,6 +300,21 @@ export default function TableStructureView({
           </div>
         )}
       </div>
+
+      <ConfirmDialog
+        isOpen={confirmDeleteIndex !== null}
+        title="Delete Column"
+        message={`Delete column "${confirmDeleteIndex !== null ? columns[confirmDeleteIndex]?.name || 'this column' : ''}"? This cannot be undone.`}
+        confirmLabel="Delete"
+        variant="danger"
+        onConfirm={() => {
+          if (confirmDeleteIndex !== null) {
+            setColumns(columns.filter((_, i) => i !== confirmDeleteIndex));
+          }
+          setConfirmDeleteIndex(null);
+        }}
+        onCancel={() => setConfirmDeleteIndex(null)}
+      />
     </div>
   );
 }

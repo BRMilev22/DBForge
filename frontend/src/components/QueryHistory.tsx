@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Clock, Star, Trash2, Copy, Play } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
+import ConfirmDialog from './ConfirmDialog';
 
 interface QueryHistoryItem {
   id: string;
@@ -21,6 +22,7 @@ interface QueryHistoryProps {
 export default function QueryHistory({ databaseId, onQuerySelect }: QueryHistoryProps) {
   const [history, setHistory] = useState<QueryHistoryItem[]>([]);
   const [filter, setFilter] = useState<'all' | 'bookmarked'>('all');
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
 
   useEffect(() => {
     // Load history from localStorage
@@ -52,9 +54,7 @@ export default function QueryHistory({ databaseId, onQuerySelect }: QueryHistory
   };
 
   const clearAll = () => {
-    if (confirm('Clear all history?')) {
-      saveHistory([]);
-    }
+    setShowClearConfirm(true);
   };
 
   const filteredHistory = filter === 'bookmarked' 
@@ -183,6 +183,18 @@ export default function QueryHistory({ databaseId, onQuerySelect }: QueryHistory
           </div>
         )}
       </div>
+      <ConfirmDialog
+        isOpen={showClearConfirm}
+        title="Clear Query History"
+        message="Remove all saved query history for this database?"
+        confirmLabel="Clear History"
+        variant="danger"
+        onConfirm={() => {
+          saveHistory([]);
+          setShowClearConfirm(false);
+        }}
+        onCancel={() => setShowClearConfirm(false)}
+      />
     </div>
   );
 }

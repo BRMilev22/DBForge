@@ -1,6 +1,7 @@
 package com.dbforge.dbforge.service;
 
 import com.dbforge.dbforge.dto.AnalyticsResponse;
+import com.dbforge.dbforge.model.AuditLog;
 import com.dbforge.dbforge.model.DatabaseInstance;
 import com.dbforge.dbforge.repository.DatabaseInstanceRepository;
 import lombok.RequiredArgsConstructor;
@@ -18,6 +19,7 @@ import java.util.stream.Collectors;
 public class AnalyticsService {
     
     private final DatabaseInstanceRepository instanceRepository;
+    private final AuditLogService auditLogService;
     private static final DateTimeFormatter FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
     
     public AnalyticsResponse getAnalytics(Long userId) {
@@ -32,8 +34,10 @@ public class AnalyticsService {
                 .filter(db -> db.getStatus() == DatabaseInstance.InstanceStatus.STOPPED)
                 .count();
         
-        // Calculate storage (mock: 256MB per database)
-        long totalStorage = totalDatabases * 256L;
+        // Calculate total storage from database instances
+        long totalStorage = databases.stream()
+                .mapToLong(db -> db.getStorage() != null ? db.getStorage() : 0L)
+                .sum();
         
         // Calculate uptime (percentage of running databases)
         double uptime = totalDatabases > 0 
@@ -76,20 +80,16 @@ public class AnalyticsService {
                         .collect(Collectors.toList()))
                 .build();
         
-        // Generate recent activity
-        List<AnalyticsResponse.ActivityEvent> recentActivity = databases.stream()
-                .sorted(Comparator.comparing(DatabaseInstance::getCreatedAt).reversed())
-                .limit(10)
-                .map(db -> AnalyticsResponse.ActivityEvent.builder()
-                        .id(db.getId())
-                        .databaseName(db.getInstanceName())
-                        .databaseType(db.getDatabaseType().getDisplayName())
-                        .action(db.getStatus() == DatabaseInstance.InstanceStatus.RUNNING ? "Started" : 
-                                db.getStatus() == DatabaseInstance.InstanceStatus.STOPPED ? "Stopped" : "Created")
-                        .status(db.getStatus().toString())
-                        .timestamp(db.getStartedAt() != null 
-                                ? db.getStartedAt().format(FORMATTER)
-                                : db.getCreatedAt().format(FORMATTER))
+        // Get recent activity from audit logs
+        List<AuditLog> auditLogs = auditLogService.getRecentActivity(userId, 20);
+        List<AnalyticsResponse.ActivityEvent> recentActivity = auditLogs.stream()
+                .map(log -> AnalyticsResponse.ActivityEvent.builder()
+                        .id(log.getId())
+                        .databaseName(log.getResourceName() != null ? log.getResourceName() : "N/A")
+                        .databaseType(log.getResourceType() != null ? log.getResourceType() : "SYSTEM")
+                        .action(formatAction(log.getAction()))
+                        .status(log.getStatus().toString())
+                        .timestamp(log.getCreatedAt().format(FORMATTER))
                         .build())
                 .collect(Collectors.toList());
         
@@ -99,5 +99,14 @@ public class AnalyticsService {
                 .databasesByStatus(databasesByStatus)
                 .recentActivity(recentActivity)
                 .build();
+    }
+    
+    private String formatAction(String action) {
+        if (action == null) return "Unknown Action";
+        
+        // Convert DATABASE_CREATED -> Database Created
+        return Arrays.stream(action.split("_"))
+                .map(word -> word.substring(0, 1).toUpperCase() + word.substring(1).toLowerCase())
+                .collect(Collectors.joining(" "));
     }
 }

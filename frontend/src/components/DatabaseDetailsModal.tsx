@@ -1,4 +1,4 @@
-import { X, Database, Play, Square, Trash2, Copy, Check, Server, Key, User, Link, Calendar, Activity, HardDrive } from 'lucide-react';
+import { X, Database, Play, Square, Trash2, Copy, Check, Server, Key, User, Link, Calendar, Activity, HardDrive, ExternalLink } from 'lucide-react';
 import { useState } from 'react';
 import type { DatabaseInstance } from '../types/database';
 
@@ -342,16 +342,175 @@ export default function DatabaseDetailsModal({
 
           {/* Quick Connect Guide */}
           <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-4">
-            <h3 className="text-xs font-semibold text-zinc-300 mb-2">Quick Connect</h3>
-            <div className="space-y-2 text-xs text-zinc-400">
-              <p>Connect to your database using your favorite client:</p>
-              <code className="block px-3 py-2 rounded-lg bg-zinc-950 border border-zinc-800 text-zinc-300 font-mono text-[11px]">
-                {database.databaseType === 'PostgreSQL' && `psql -h ${database.connectionInfo.host} -p ${database.connectionInfo.port} -U ${database.connectionInfo.username} -d ${database.connectionInfo.database}`}
-                {database.databaseType === 'MySQL' && `mysql -h ${database.connectionInfo.host} -P ${database.connectionInfo.port} -u ${database.connectionInfo.username} -p${database.connectionInfo.password} ${database.connectionInfo.database}`}
-                {database.databaseType === 'MariaDB' && `mariadb -h ${database.connectionInfo.host} -P ${database.connectionInfo.port} -u ${database.connectionInfo.username} -p${database.connectionInfo.password} ${database.connectionInfo.database}`}
-                {database.databaseType === 'MongoDB' && `mongosh "mongodb://${database.connectionInfo.username}:${database.connectionInfo.password}@${database.connectionInfo.host}:${database.connectionInfo.port}/${database.connectionInfo.database}"`}
-                {database.databaseType === 'Redis' && `redis-cli -h ${database.connectionInfo.host} -p ${database.connectionInfo.port} -a ${database.connectionInfo.password}`}
-              </code>
+            <h3 className="text-xs font-semibold text-zinc-300 mb-3">Quick Connect</h3>
+            <div className="space-y-3 text-xs text-zinc-400">
+              <div>
+                <p className="mb-2 text-zinc-500">Open in database client:</p>
+                <div className="flex flex-wrap gap-2">
+                  {/* PostgreSQL Clients */}
+                  {database.databaseType === 'postgresql' && (
+                    <>
+                      <a
+                        href={`postgresql://${database.connectionInfo.username}:${database.connectionInfo.password}@${database.connectionInfo.host}:${database.connectionInfo.port}/${database.connectionInfo.database}`}
+                        className="px-3 py-2 rounded-lg bg-violet-500 hover:bg-violet-400 text-white font-medium text-xs transition flex items-center gap-2"
+                        title="Open in Postico (macOS)"
+                      >
+                        <ExternalLink className="w-3.5 h-3.5" />
+                        Postico
+                      </a>
+                      <a
+                        href={`postgresql://${database.connectionInfo.username}:${database.connectionInfo.password}@${database.connectionInfo.host}:${database.connectionInfo.port}/${database.connectionInfo.database}`}
+                        className="px-3 py-2 rounded-lg bg-violet-500 hover:bg-violet-400 text-white font-medium text-xs transition flex items-center gap-2"
+                        title="Open in TablePlus"
+                      >
+                        <ExternalLink className="w-3.5 h-3.5" />
+                        TablePlus
+                      </a>
+                      <a
+                        href={`postgres://${database.connectionInfo.username}:${database.connectionInfo.password}@${database.connectionInfo.host}:${database.connectionInfo.port}/${database.connectionInfo.database}`}
+                        className="px-3 py-2 rounded-lg bg-zinc-700 hover:bg-zinc-600 text-white font-medium text-xs transition flex items-center gap-2"
+                        title="Open in DataGrip or other clients"
+                      >
+                        <ExternalLink className="w-3.5 h-3.5" />
+                        Other
+                      </a>
+                    </>
+                  )}
+
+                  {/* MySQL Clients */}
+                  {database.databaseType === 'mysql' && (
+                    <>
+                      <a
+                        href={`mysql://${database.connectionInfo.username}:${database.connectionInfo.password}@${database.connectionInfo.host}:${database.connectionInfo.port}/${database.connectionInfo.database}`}
+                        className="px-3 py-2 rounded-lg bg-violet-500 hover:bg-violet-400 text-white font-medium text-xs transition flex items-center gap-2"
+                        title="Open in Sequel Ace (macOS)"
+                      >
+                        <ExternalLink className="w-3.5 h-3.5" />
+                        Sequel Ace
+                      </a>
+                      <a
+                        href={`mysql://${database.connectionInfo.username}:${database.connectionInfo.password}@${database.connectionInfo.host}:${database.connectionInfo.port}/${database.connectionInfo.database}`}
+                        className="px-3 py-2 rounded-lg bg-violet-500 hover:bg-violet-400 text-white font-medium text-xs transition flex items-center gap-2"
+                        title="Open in TablePlus"
+                      >
+                        <ExternalLink className="w-3.5 h-3.5" />
+                        TablePlus
+                      </a>
+                      <a
+                        href={`mysql://${database.connectionInfo.username}:${database.connectionInfo.password}@${database.connectionInfo.host}:${database.connectionInfo.port}/${database.connectionInfo.database}`}
+                        className="px-3 py-2 rounded-lg bg-zinc-700 hover:bg-zinc-600 text-white font-medium text-xs transition flex items-center gap-2"
+                        title="Open in MySQL Workbench, DBeaver, or other clients"
+                      >
+                        <ExternalLink className="w-3.5 h-3.5" />
+                        Other
+                      </a>
+                    </>
+                  )}
+
+                  {/* MariaDB Clients (uses MySQL protocol) */}
+                  {database.databaseType === 'mariadb' && (
+                    <>
+                      <a
+                        href={`mysql://${database.connectionInfo.username}:${database.connectionInfo.password}@${database.connectionInfo.host}:${database.connectionInfo.port}/${database.connectionInfo.database}`}
+                        className="px-3 py-2 rounded-lg bg-violet-500 hover:bg-violet-400 text-white font-medium text-xs transition flex items-center gap-2"
+                        title="Open in TablePlus"
+                      >
+                        <ExternalLink className="w-3.5 h-3.5" />
+                        TablePlus
+                      </a>
+                      <a
+                        href={`mysql://${database.connectionInfo.username}:${database.connectionInfo.password}@${database.connectionInfo.host}:${database.connectionInfo.port}/${database.connectionInfo.database}`}
+                        className="px-3 py-2 rounded-lg bg-violet-500 hover:bg-violet-400 text-white font-medium text-xs transition flex items-center gap-2"
+                        title="Open in HeidiSQL (Windows)"
+                      >
+                        <ExternalLink className="w-3.5 h-3.5" />
+                        HeidiSQL
+                      </a>
+                      <a
+                        href={`mysql://${database.connectionInfo.username}:${database.connectionInfo.password}@${database.connectionInfo.host}:${database.connectionInfo.port}/${database.connectionInfo.database}`}
+                        className="px-3 py-2 rounded-lg bg-zinc-700 hover:bg-zinc-600 text-white font-medium text-xs transition flex items-center gap-2"
+                        title="Open in DBeaver or other MySQL-compatible clients"
+                      >
+                        <ExternalLink className="w-3.5 h-3.5" />
+                        Other
+                      </a>
+                    </>
+                  )}
+
+                  {/* MongoDB Clients */}
+                  {database.databaseType === 'mongodb' && (
+                    <>
+                      <a
+                        href={`mongodb-compass://connect?connectionString=${encodeURIComponent(`mongodb://${database.connectionInfo.username}:${database.connectionInfo.password}@${database.connectionInfo.host}:${database.connectionInfo.port}/${database.connectionInfo.database}`)}`}
+                        className="px-3 py-2 rounded-lg bg-violet-500 hover:bg-violet-400 text-white font-medium text-xs transition flex items-center gap-2"
+                        title="Open in MongoDB Compass"
+                      >
+                        <ExternalLink className="w-3.5 h-3.5" />
+                        Compass
+                      </a>
+                      <a
+                        href={`mongodb://${database.connectionInfo.username}:${database.connectionInfo.password}@${database.connectionInfo.host}:${database.connectionInfo.port}/${database.connectionInfo.database}`}
+                        className="px-3 py-2 rounded-lg bg-violet-500 hover:bg-violet-400 text-white font-medium text-xs transition flex items-center gap-2"
+                        title="Open in TablePlus"
+                      >
+                        <ExternalLink className="w-3.5 h-3.5" />
+                        TablePlus
+                      </a>
+                      <a
+                        href={`mongodb://${database.connectionInfo.username}:${database.connectionInfo.password}@${database.connectionInfo.host}:${database.connectionInfo.port}/${database.connectionInfo.database}`}
+                        className="px-3 py-2 rounded-lg bg-zinc-700 hover:bg-zinc-600 text-white font-medium text-xs transition flex items-center gap-2"
+                        title="Open in Studio 3T, Robo 3T, or other clients"
+                      >
+                        <ExternalLink className="w-3.5 h-3.5" />
+                        Other
+                      </a>
+                    </>
+                  )}
+
+                  {/* Redis Clients */}
+                  {database.databaseType === 'redis' && (
+                    <>
+                      <a
+                        href={`redis://default:${database.connectionInfo.password}@${database.connectionInfo.host}:${database.connectionInfo.port}`}
+                        className="px-3 py-2 rounded-lg bg-violet-500 hover:bg-violet-400 text-white font-medium text-xs transition flex items-center gap-2"
+                        title="Open in RedisInsight"
+                      >
+                        <ExternalLink className="w-3.5 h-3.5" />
+                        RedisInsight
+                      </a>
+                      <a
+                        href={`redis://default:${database.connectionInfo.password}@${database.connectionInfo.host}:${database.connectionInfo.port}`}
+                        className="px-3 py-2 rounded-lg bg-violet-500 hover:bg-violet-400 text-white font-medium text-xs transition flex items-center gap-2"
+                        title="Open in TablePlus"
+                      >
+                        <ExternalLink className="w-3.5 h-3.5" />
+                        TablePlus
+                      </a>
+                      <a
+                        href={`redis://default:${database.connectionInfo.password}@${database.connectionInfo.host}:${database.connectionInfo.port}`}
+                        className="px-3 py-2 rounded-lg bg-zinc-700 hover:bg-zinc-600 text-white font-medium text-xs transition flex items-center gap-2"
+                        title="Open in Another Redis Desktop Manager or other clients"
+                      >
+                        <ExternalLink className="w-3.5 h-3.5" />
+                        Other
+                      </a>
+                    </>
+                  )}
+                </div>
+                <p className="mt-2 text-[11px] text-zinc-600">
+                  Click a button to open the connection in your installed client. If nothing happens, install the client first.
+                </p>
+              </div>
+              <div className="pt-2 border-t border-zinc-800">
+                <p className="mb-2 text-zinc-500">Or use CLI:</p>
+                <code className="block px-3 py-2 rounded-lg bg-zinc-950 border border-zinc-800 text-zinc-300 font-mono text-[11px]">
+                  {database.databaseType === 'postgresql' && `psql -h ${database.connectionInfo.host} -p ${database.connectionInfo.port} -U ${database.connectionInfo.username} -d ${database.connectionInfo.database}`}
+                  {database.databaseType === 'mysql' && `mysql -h ${database.connectionInfo.host} -P ${database.connectionInfo.port} -u ${database.connectionInfo.username} -p${database.connectionInfo.password} ${database.connectionInfo.database}`}
+                  {database.databaseType === 'mariadb' && `mariadb -h ${database.connectionInfo.host} -P ${database.connectionInfo.port} -u ${database.connectionInfo.username} -p${database.connectionInfo.password} ${database.connectionInfo.database}`}
+                  {database.databaseType === 'mongodb' && `mongosh "mongodb://${database.connectionInfo.username}:${database.connectionInfo.password}@${database.connectionInfo.host}:${database.connectionInfo.port}/${database.connectionInfo.database}"`}
+                  {database.databaseType === 'redis' && `redis-cli -h ${database.connectionInfo.host} -p ${database.connectionInfo.port} -a ${database.connectionInfo.password}`}
+                </code>
+              </div>
               {/* API Token display for Quick Connect */}
               <div className="mt-3 flex items-start gap-2">
                 <div className="flex-1">

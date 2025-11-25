@@ -17,12 +17,14 @@ import java.util.*;
 public class QueryExecutionService {
     
     private final DatabaseInstanceRepository databaseInstanceRepository;
+    private final AuditLogService auditLogService;
     
     public QueryResult executeQuery(Long instanceId, QueryRequest request) {
         long startTime = System.currentTimeMillis();
         
         DatabaseInstance instance = databaseInstanceRepository.findById(instanceId)
             .orElseThrow(() -> new RuntimeException("Database instance not found"));
+        Long userId = instance.getUserId();
         String dbType = instance.getDatabaseType().getName().toLowerCase();
             
         if (instance.getStatus() != DatabaseInstance.InstanceStatus.RUNNING) {
@@ -48,15 +50,26 @@ public class QueryExecutionService {
                 return executeExplainQuery(conn, request, dbType);
             }
 
+            QueryResult result;
             if ("SELECT".equals(queryType)) {
-                return executeSelectQuery(conn, request);
+                result = executeSelectQuery(conn, request);
             } else {
-                return executeUpdateQuery(conn, request, queryType);
+                result = executeUpdateQuery(conn, request, queryType);
             }
+            
+            // Log query execution
+            logQueryExecution(userId, instance, queryType, request.getQuery(), result);
+            
+            return result;
             
         } catch (SQLException e) {
             log.error("Query execution error: {}", e.getMessage());
             long executionTime = System.currentTimeMillis() - startTime;
+            
+            // Log failed query
+            auditLogService.logFailure(userId, "QUERY_EXECUTED", "DATABASE", instance.getId(),
+                    instance.getInstanceName(), "Query failed: " + e.getMessage());
+            
             return QueryResult.builder()
                 .success(false)
                 .error(e.getMessage())
@@ -241,5 +254,39 @@ public class QueryExecutionService {
             default:
                 throw new RuntimeException("Unsupported database type: " + dbType);
         }
+    }
+    
+    private void logQueryExecution(Long userId, DatabaseInstance instance, String queryType, 
+                                   String query, QueryResult result) {
+        String action = getActionForQueryType(queryType);
+        String queryPreview = query.length() > 100 ? query.substring(0, 100) + "..." : query;
+        
+        String details = String.format("Type: %s, Execution time: %dms", 
+                queryType, result.getExecutionTimeMs());
+        
+        if (result.getAffectedRows() != null && result.getAffectedRows() > 0) {
+            details += String.format(", Affected rows: %d", result.getAffectedRows());
+        } else if (result.getRowCount() != null) {
+            details += String.format(", Returned rows: %d", result.getRowCount());
+        }
+        
+        details += ", Query: " + queryPreview;
+        
+        auditLogService.logSuccess(userId, action, "DATABASE", instance.getId(),
+                instance.getInstanceName(), details);
+    }
+    
+    private String getActionForQueryType(String queryType) {
+        return switch (queryType) {
+            case "SELECT" -> "QUERY_EXECUTED";
+            case "INSERT" -> "DATA_INSERTED";
+            case "UPDATE" -> "DATA_UPDATED";
+            case "DELETE" -> "DATA_DELETED";
+            case "CREATE" -> "SCHEMA_CREATED";
+            case "ALTER" -> "SCHEMA_ALTERED";
+            case "DROP" -> "SCHEMA_DROPPED";
+            case "TRUNCATE" -> "TABLE_TRUNCATED";
+            default -> "QUERY_EXECUTED";
+        };
     }
 }

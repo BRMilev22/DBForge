@@ -69,8 +69,8 @@ export default function AuthModal({ onClose }: AuthModalProps) {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-[#0a0f1a]/95 backdrop-blur-xl border border-cyan-500/20 rounded-2xl p-8 max-w-md w-full relative">
+    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div className="bg-[#0e0e11]/95 backdrop-blur-xl border border-purple-500/20 rounded-2xl p-8 max-w-md w-full relative shadow-2xl shadow-purple-500/10">
         <button
           onClick={onClose}
           className="absolute top-4 right-4 text-gray-400 hover:text-white transition-colors"
@@ -79,7 +79,7 @@ export default function AuthModal({ onClose }: AuthModalProps) {
         </button>
 
         <div className="text-center mb-8">
-          <h2 className="text-3xl font-bold bg-gradient-to-r from-cyan-400 to-green-400 bg-clip-text text-transparent mb-2">
+          <h2 className="text-3xl font-bold bg-gradient-to-r from-purple-400 to-fuchsia-400 bg-clip-text text-transparent mb-2">
             {isLogin ? 'Welcome Back' : 'Create Account'}
           </h2>
           <p className="text-gray-400">
@@ -105,7 +105,7 @@ export default function AuthModal({ onClose }: AuthModalProps) {
                   type="email"
                   value={loginForm.email}
                   onChange={(e) => setLoginForm({ ...loginForm, email: e.target.value })}
-                  className="w-full bg-[#050810]/50 border border-cyan-500/20 rounded-lg pl-10 pr-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-cyan-500/50 transition-colors"
+                  className="w-full bg-[#030014]/50 border border-purple-500/20 rounded-lg pl-10 pr-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-purple-500/50 transition-colors"
                   placeholder="your@email.com"
                   required
                 />
@@ -122,7 +122,7 @@ export default function AuthModal({ onClose }: AuthModalProps) {
                   type="password"
                   value={loginForm.password}
                   onChange={(e) => setLoginForm({ ...loginForm, password: e.target.value })}
-                  className="w-full bg-[#050810]/50 border border-cyan-500/20 rounded-lg pl-10 pr-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-cyan-500/50 transition-colors"
+                  className="w-full bg-[#030014]/50 border border-purple-500/20 rounded-lg pl-10 pr-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-purple-500/50 transition-colors"
                   placeholder="••••••••"
                   required
                 />
@@ -132,7 +132,7 @@ export default function AuthModal({ onClose }: AuthModalProps) {
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-gradient-to-r from-cyan-500 to-green-500 text-white py-3 rounded-lg font-semibold hover:shadow-lg hover:shadow-cyan-500/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full bg-gradient-to-r from-purple-600 to-fuchsia-600 text-white py-3 rounded-lg font-semibold hover:shadow-lg hover:shadow-purple-500/25 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? 'Signing in...' : 'Sign In'}
             </button>
@@ -149,7 +149,7 @@ export default function AuthModal({ onClose }: AuthModalProps) {
                   type="text"
                   value={registerForm.username}
                   onChange={(e) => setRegisterForm({ ...registerForm, username: e.target.value })}
-                  className="w-full bg-[#050810]/50 border border-cyan-500/20 rounded-lg pl-10 pr-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-cyan-500/50 transition-colors"
+                  className="w-full bg-[#030014]/50 border border-purple-500/20 rounded-lg pl-10 pr-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-purple-500/50 transition-colors"
                   placeholder="johndoe"
                   required
                 />
@@ -166,7 +166,7 @@ export default function AuthModal({ onClose }: AuthModalProps) {
                   type="email"
                   value={registerForm.email}
                   onChange={(e) => setRegisterForm({ ...registerForm, email: e.target.value })}
-                  className="w-full bg-[#050810]/50 border border-cyan-500/20 rounded-lg pl-10 pr-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-cyan-500/50 transition-colors"
+                  className="w-full bg-[#030014]/50 border border-purple-500/20 rounded-lg pl-10 pr-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-purple-500/50 transition-colors"
                   placeholder="your@email.com"
                   required
                 />
@@ -182,7 +182,7 @@ export default function AuthModal({ onClose }: AuthModalProps) {
                   type="text"
                   value={registerForm.firstName}
                   onChange={(e) => setRegisterForm({ ...registerForm, firstName: e.target.value })}
-                  className="w-full bg-[#050810]/50 border border-cyan-500/20 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-cyan-500/50 transition-colors"
+                  className="w-full bg-[#030014]/50 border border-purple-500/20 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-purple-500/50 transition-colors"
                   placeholder="John"
                   required
                 />
@@ -195,7 +195,7 @@ export default function AuthModal({ onClose }: AuthModalProps) {
                   type="text"
                   value={registerForm.lastName}
                   onChange={(e) => setRegisterForm({ ...registerForm, lastName: e.target.value })}
-                  className="w-full bg-[#050810]/50 border border-cyan-500/20 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-cyan-500/50 transition-colors"
+                  className="w-full bg-[#030014]/50 border border-purple-500/20 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-purple-500/50 transition-colors"
                   placeholder="Doe"
                   required
                 />
@@ -212,7 +212,7 @@ export default function AuthModal({ onClose }: AuthModalProps) {
                   type="password"
                   value={registerForm.password}
                   onChange={(e) => setRegisterForm({ ...registerForm, password: e.target.value })}
-                  className="w-full bg-[#050810]/50 border border-cyan-500/20 rounded-lg pl-10 pr-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-cyan-500/50 transition-colors"
+                  className="w-full bg-[#030014]/50 border border-purple-500/20 rounded-lg pl-10 pr-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-purple-500/50 transition-colors"
                   placeholder="••••••••"
                   required
                   minLength={6}
@@ -223,7 +223,7 @@ export default function AuthModal({ onClose }: AuthModalProps) {
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-gradient-to-r from-cyan-500 to-green-500 text-white py-3 rounded-lg font-semibold hover:shadow-lg hover:shadow-cyan-500/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full bg-gradient-to-r from-purple-600 to-fuchsia-600 text-white py-3 rounded-lg font-semibold hover:shadow-lg hover:shadow-purple-500/25 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? 'Creating account...' : 'Create Account'}
             </button>
@@ -236,7 +236,7 @@ export default function AuthModal({ onClose }: AuthModalProps) {
               setIsLogin(!isLogin);
               setError(null);
             }}
-            className="text-cyan-400 hover:text-cyan-300 text-sm transition-colors"
+            className="text-purple-400 hover:text-purple-300 text-sm transition-colors"
           >
             {isLogin ? "Don't have an account? Sign up" : 'Already have an account? Sign in'}
           </button>
