@@ -46,6 +46,18 @@ DBForge is a complete DBaaS solution that enables developers to provision, manag
         <sub><b>SDK Documentation</b></sub>
       </td>
     </tr>
+    <tr>
+      <td align="center" width="50%">
+        <img src="demo-pics/DBForge_brochure.png" alt="Project Brochure Front" width="100%"/>
+        <br/>
+        <sub><b>Project Brochure - Front</b></sub>
+      </td>
+      <td align="center" width="50%">
+        <img src="demo-pics/DBForge_brochure_2.png" alt="Project Brochure Back" width="100%"/>
+        <br/>
+        <sub><b>Project Brochure - Back</b></sub>
+      </td>
+    </tr>
   </table>
 </div>
 
