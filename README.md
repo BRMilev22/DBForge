@@ -420,6 +420,16 @@ Each database type has 10 ports allocated (expandable as needed).
 
 MIT License. See LICENSE file for details.
 
-## Repository
+---
 
-[https://github.com/BRMilev22/DBForge](https://github.com/BRMilev22/DBForge)
+<div align="center">
+  <p>Forged with ❤️ for builders</p>
+  <p>
+    <strong>Developed by</strong><br/>
+    <a href="https://github.com/brmilev22">brmilev22 (Boris Milev)</a> • <a href="https://github.com/vbboyanov22">vbboyanov22 (Veselin Boyanov)</a>
+  </p>
+  <p>
+    <strong>Design by</strong><br/>
+    <a href="https://github.com/prpetkov22">prpetkov22 (Plamen Petkov)</a>
+  </p>
+</div>
