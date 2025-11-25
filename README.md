@@ -1,13 +1,57 @@
-# DBForge
-
-Database as a Service platform for deploying and managing containerized database instances with a modern web interface and client framework support.
+<div align="center">
+  <img src="frontend/public/dbforge-logo.png" alt="DBForge Logo" width="120"/>
+  <h1>DBForge</h1>
+  <p>Database as a Service platform for deploying and managing containerized database instances with a modern web interface and client framework support.</p>
+</div>
 
 ## Overview
 
 DBForge is a complete DBaaS solution that enables developers to provision, manage, and connect to PostgreSQL, MySQL, MariaDB, MongoDB, and Redis databases through Docker containers. The platform includes a Spring Boot backend API, React frontend dashboard, and client frameworks for both JavaScript and Python.
 
-## Table of Contents
+<div align="center">
+  <table>
+    <tr>
+      <td align="center" width="50%">
+        <img src="demo-pics/landing-page-top.png" alt="Landing Page Top" width="100%"/>
+        <br/>
+        <sub><b>Landing Page - Hero Section</b></sub>
+      </td>
+      <td align="center" width="50%">
+        <img src="demo-pics/landing-page-down.png" alt="Landing Page Bottom" width="100%"/>
+        <br/>
+        <sub><b>Landing Page - Features</b></sub>
+      </td>
+    </tr>
+    <tr>
+      <td align="center" width="50%">
+        <img src="demo-pics/logged-in-overview-tab.png" alt="Dashboard Overview" width="100%"/>
+        <br/>
+        <sub><b>Dashboard Overview</b></sub>
+      </td>
+      <td align="center" width="50%">
+        <img src="demo-pics/create-new-database.png" alt="Create Database" width="100%"/>
+        <br/>
+        <sub><b>Create Database</b></sub>
+      </td>
+    </tr>
+    <tr>
+      <td align="center" width="50%">
+        <img src="demo-pics/query-interface.png" alt="Query Interface" width="100%"/>
+        <br/>
+        <sub><b>Query Interface</b></sub>
+      </td>
+      <td align="center" width="50%">
+        <img src="demo-pics/sdk-doc-page.png" alt="SDK Documentation" width="100%"/>
+        <br/>
+        <sub><b>SDK Documentation</b></sub>
+      </td>
+    </tr>
+  </table>
+</div>
 
+<br/>
+
+## Table of Contents
 - [Architecture](#architecture)
 - [Core Components](#core-components)
 - [Quick Start](#quick-start)
