@@ -4,9 +4,13 @@ import com.dbforge.dbforge.dto.CreateDatabaseRequest;
 import com.dbforge.dbforge.dto.DatabaseResponse;
 import com.dbforge.dbforge.model.DatabaseInstance;
 import com.dbforge.dbforge.model.DatabaseType;
+import com.dbforge.dbforge.model.User;
+import com.dbforge.dbforge.repository.UserRepository;
 import com.dbforge.dbforge.service.DatabaseService;
+import com.dbforge.dbforge.service.PaymentService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
@@ -23,6 +27,8 @@ import java.util.stream.Collectors;
 public class DatabaseController {
     
     private final DatabaseService databaseService;
+    private final UserRepository userRepository;
+    private final PaymentService paymentService;
     
     private Long getUserId(Authentication authentication) {
         if (authentication == null || authentication.getPrincipal() == null) {
@@ -43,7 +49,28 @@ public class DatabaseController {
         
         try {
             Long userId = getUserId(authentication);
-            log.info("Creating database: {} for user: {}", request.getInstanceName(), userId);
+            
+            // Check subscription limit
+            User user = userRepository.findById(userId)
+                    .orElseThrow(() -> new RuntimeException("User not found"));
+            
+            int currentDatabaseCount = databaseService.getUserDatabases(userId).size();
+            int limit = user.getSubscriptionTier().getDatabaseLimit();
+            
+            if (currentDatabaseCount >= limit) {
+                log.warn("User {} has reached database limit ({}/{})", user.getUsername(), currentDatabaseCount, limit);
+                return ResponseEntity.status(HttpStatus.PAYMENT_REQUIRED).body(Map.of(
+                    "error", "Database limit reached",
+                    "message", "You have reached your limit of " + limit + " databases. Please upgrade your plan to create more.",
+                    "currentCount", currentDatabaseCount,
+                    "limit", limit,
+                    "tier", user.getSubscriptionTier().name(),
+                    "upgradeRequired", true
+                ));
+            }
+            
+            log.info("Creating database: {} for user: {} ({}/{})", 
+                    request.getInstanceName(), userId, currentDatabaseCount + 1, limit);
             
             DatabaseInstance instance = databaseService.createDatabase(
                     userId,
@@ -74,6 +101,30 @@ public class DatabaseController {
         } catch (Exception e) {
             log.error("Failed to get databases", e);
             return ResponseEntity.status(401).body(List.of());
+        }
+    }
+    
+    @GetMapping("/usage")
+    public ResponseEntity<Map<String, Object>> getDatabaseUsage(Authentication authentication) {
+        try {
+            Long userId = getUserId(authentication);
+            User user = userRepository.findById(userId)
+                    .orElseThrow(() -> new RuntimeException("User not found"));
+            
+            int currentCount = databaseService.getUserDatabases(userId).size();
+            int limit = user.getSubscriptionTier().getDatabaseLimit();
+            
+            return ResponseEntity.ok(Map.of(
+                "currentCount", currentCount,
+                "limit", limit,
+                "tier", user.getSubscriptionTier().name(),
+                "remaining", limit - currentCount,
+                "percentUsed", Math.round((currentCount * 100.0) / limit),
+                "canCreate", currentCount < limit
+            ));
+        } catch (Exception e) {
+            log.error("Failed to get database usage", e);
+            return ResponseEntity.status(500).body(Map.of("error", e.getMessage()));
         }
     }
     

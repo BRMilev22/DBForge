@@ -58,3 +58,4 @@ vps-*.txt
 
 # OS
 Thumbs.db
+backend/application-prod.properties

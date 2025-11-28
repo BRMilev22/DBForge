@@ -1,4 +1,4 @@
-import { DbForgeClient } from '../framework/src/client.js';
+import DbForgeClient from '../framework/src/client.js';
 import dotenv from 'dotenv';
 dotenv.config();
 

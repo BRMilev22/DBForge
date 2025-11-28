@@ -1,8 +1,6 @@
 package com.dbforge.dbforge.controller;
 
-import com.dbforge.dbforge.dto.AuthResponse;
-import com.dbforge.dbforge.dto.LoginRequest;
-import com.dbforge.dbforge.dto.RegisterRequest;
+import com.dbforge.dbforge.dto.*;
 import com.dbforge.dbforge.service.AuthService;
 import com.dbforge.dbforge.util.JwtUtil;
 import lombok.RequiredArgsConstructor;
@@ -23,6 +21,67 @@ public class AuthController {
     private final AuthService authService;
     private final JwtUtil jwtUtil;
     
+    /**
+     * Step 1: Initiate registration with phone number
+     */
+    @PostMapping("/register/initiate")
+    public ResponseEntity<?> initiateRegistration(@RequestBody RegisterInitiateRequest request) {
+        try {
+            RegisterInitiateResponse response = authService.initiateRegistration(request);
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            log.error("Registration initiation failed", e);
+            return ResponseEntity.status(400).body(Map.of("error", e.getMessage()));
+        }
+    }
+    
+    /**
+     * Step 2: Send verification code via Telegram
+     */
+    @PostMapping("/register/send-code")
+    public ResponseEntity<?> sendVerificationCode(@RequestBody SendCodeRequest request) {
+        try {
+            authService.sendVerificationCode(request.getPhoneNumber());
+            return ResponseEntity.ok(Map.of(
+                "success", true,
+                "message", "Verification code sent to your Telegram"
+            ));
+        } catch (Exception e) {
+            log.error("Failed to send verification code", e);
+            return ResponseEntity.status(400).body(Map.of("error", e.getMessage()));
+        }
+    }
+    
+    /**
+     * Step 3: Verify code and complete registration
+     */
+    @PostMapping("/register/verify")
+    public ResponseEntity<?> verifyAndCompleteRegistration(@RequestBody VerifyCodeRequest request) {
+        try {
+            AuthResponse response = authService.verifyAndCompleteRegistration(request);
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            log.error("Verification failed", e);
+            return ResponseEntity.status(400).body(Map.of("error", e.getMessage()));
+        }
+    }
+    
+    /**
+     * Check if phone is linked to Telegram (for frontend polling)
+     */
+    @GetMapping("/register/check-telegram")
+    public ResponseEntity<?> checkTelegramLinked(@RequestParam String phoneNumber) {
+        try {
+            boolean linked = authService.isPhoneLinkedToTelegram(phoneNumber);
+            return ResponseEntity.ok(Map.of("telegramLinked", linked));
+        } catch (Exception e) {
+            return ResponseEntity.status(400).body(Map.of("error", e.getMessage()));
+        }
+    }
+    
+    /**
+     * Legacy register endpoint - now requires phone verification
+     */
     @PostMapping("/register")
     public ResponseEntity<?> register(@RequestBody RegisterRequest request) {
         try {

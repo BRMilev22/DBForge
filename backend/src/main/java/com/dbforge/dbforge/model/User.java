@@ -28,6 +28,22 @@ public class User {
     @Column(name = "last_name", length = 100)
     private String lastName;
     
+    // Phone verification fields
+    @Column(name = "phone_number", unique = true, length = 20)
+    private String phoneNumber;
+    
+    @Column(name = "telegram_chat_id")
+    private Long telegramChatId;
+    
+    @Column(name = "verification_code", length = 6)
+    private String verificationCode;
+    
+    @Column(name = "verification_expires_at")
+    private LocalDateTime verificationExpiresAt;
+    
+    @Column(name = "phone_verified")
+    private Boolean phoneVerified = false;
+    
     @Enumerated(EnumType.STRING)
     @Column(length = 20)
     private UserRole role = UserRole.STUDENT;
@@ -38,6 +54,20 @@ public class User {
     
     @Column(name = "email_verified")
     private Boolean emailVerified = false;
+    
+    // Subscription fields
+    @Enumerated(EnumType.STRING)
+    @Column(name = "subscription_tier", length = 20)
+    private SubscriptionTier subscriptionTier = SubscriptionTier.FREE;
+    
+    @Column(name = "stripe_customer_id")
+    private String stripeCustomerId;
+    
+    @Column(name = "stripe_subscription_id")
+    private String stripeSubscriptionId;
+    
+    @Column(name = "subscription_expires_at")
+    private LocalDateTime subscriptionExpiresAt;
     
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
@@ -64,6 +94,22 @@ public class User {
     }
     
     public enum UserStatus {
-        ACTIVE, SUSPENDED, DELETED
+        ACTIVE, SUSPENDED, DELETED, PENDING_VERIFICATION
+    }
+    
+    public enum SubscriptionTier {
+        FREE(2),       // 2 databases
+        PRO(10),       // 10 databases - $9/month
+        BUSINESS(50);  // 50 databases - $29/month
+        
+        private final int databaseLimit;
+        
+        SubscriptionTier(int databaseLimit) {
+            this.databaseLimit = databaseLimit;
+        }
+        
+        public int getDatabaseLimit() {
+            return databaseLimit;
+        }
     }
 }

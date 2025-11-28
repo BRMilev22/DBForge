@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { Plus, Database, RefreshCw, AlertCircle, Play, Square, Trash2, Copy, Check, Activity, Zap, Clock, Settings, BarChart3, FileText, Download, Code, ChevronRight } from 'lucide-react';
+import { Plus, Database, RefreshCw, AlertCircle, Play, Square, Trash2, Copy, Check, Activity, Zap, Clock, Settings, BarChart3, FileText, Download, Code, ChevronRight, Crown } from 'lucide-react';
 import { activityApi, analyticsApi, databaseApi, type AnalyticsResponse } from './services/api';
+import { paymentApi, type DatabaseUsage } from './services/paymentApi';
 import CreateDatabaseModal from './components/CreateDatabaseModal';
 import DatabaseSelector from './components/DatabaseSelector';
 import DatabaseDetailsModal from './components/DatabaseDetailsModal';
@@ -8,6 +9,9 @@ import DatabaseWorkbench from './components/DatabaseWorkbench';
 import AuthModal from './components/AuthModal';
 import Landing from './components/Landing';
 import Examples from './components/Examples';
+import PricingModal from './components/PricingModal';
+import UpgradePrompt from './components/UpgradePrompt';
+import PaymentSuccess from './components/PaymentSuccess';
 import { useAuth } from './contexts/AuthContext';
 import type { DatabaseInstance, DatabaseType } from './types/database';
 import ConfirmDialog from './components/ConfirmDialog';
@@ -33,6 +37,20 @@ function App() {
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [frameworkInitialTab, setFrameworkInitialTab] = useState<string | undefined>(undefined);
   const [frameworkInitialExpanded, setFrameworkInitialExpanded] = useState<string[] | undefined>(undefined);
+
+  // Pricing/subscription state
+  const [showPricingModal, setShowPricingModal] = useState(false);
+  const [showUpgradePrompt, setShowUpgradePrompt] = useState(false);
+  const [databaseUsage, setDatabaseUsage] = useState<DatabaseUsage | null>(null);
+  const [upgradePromptData, setUpgradePromptData] = useState<{ currentCount: number; limit: number; tier: string } | null>(null);
+  const [showPaymentSuccess, setShowPaymentSuccess] = useState(false);
+
+  // Check for payment success redirect
+  useEffect(() => {
+    if (window.location.pathname === '/payment/success' && window.location.search.includes('session_id')) {
+      setShowPaymentSuccess(true);
+    }
+  }, []);
 
   // Settings state
   const [refreshInterval, setRefreshInterval] = useState(3);
@@ -129,6 +147,7 @@ function App() {
     if (user) {
       loadDatabases();
       loadDatabaseTypes();
+      loadDatabaseUsage();
     } else {
       setIsLoading(false);
     }
@@ -157,12 +176,31 @@ function App() {
       // Wait a bit for Docker to start the container
       await new Promise(resolve => setTimeout(resolve, 2000));
       await loadDatabases();
-    } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : 'Failed to create database. Please try again.';
-      showToast(errorMsg, 'error');
+      // Refresh usage after creating
+      loadDatabaseUsage();
+    } catch (err: any) {
+      // Check if it's a payment required error (402)
+      if (err.response?.status === 402 && err.response?.data?.upgradeRequired) {
+        const { currentCount, limit, tier } = err.response.data;
+        setUpgradePromptData({ currentCount, limit, tier });
+        setShowUpgradePrompt(true);
+        setIsModalOpen(false);
+      } else {
+        const errorMsg = err.response?.data?.error || err.message || 'Failed to create database. Please try again.';
+        showToast(errorMsg, 'error');
+      }
       console.error('Error creating database:', err);
     } finally {
       setIsCreating(false);
+    }
+  };
+
+  const loadDatabaseUsage = async () => {
+    try {
+      const usage = await paymentApi.getDatabaseUsage();
+      setDatabaseUsage(usage);
+    } catch (err) {
+      console.error('Failed to load database usage:', err);
     }
   };
 
@@ -202,6 +240,7 @@ function App() {
           await databaseApi.deleteDatabase(id);
           showToast('Database deleted successfully!', 'success');
           await loadDatabases();
+          loadDatabaseUsage(); // Refresh usage after delete
         } catch (err) {
           const errorMsg = err instanceof Error ? err.message : 'Failed to delete database.';
           showToast(errorMsg, 'error');
@@ -224,6 +263,7 @@ function App() {
           await Promise.all(deletePromises);
           showToast(`Successfully deleted ${total} database${total === 1 ? '' : 's'}!`, 'success');
           await loadDatabases();
+          loadDatabaseUsage(); // Refresh usage after delete
         } catch (err) {
           const errorMsg = err instanceof Error ? err.message : 'Failed to delete all databases.';
           showToast(errorMsg, 'error');
@@ -297,6 +337,20 @@ function App() {
         <Landing onGetStarted={() => setShowAuthModal(true)} />
         {showAuthModal && <AuthModal onClose={() => setShowAuthModal(false)} />}
       </>
+    );
+  }
+
+  // Handle payment success redirect
+  if (showPaymentSuccess) {
+    return (
+      <PaymentSuccess
+        onComplete={() => {
+          setShowPaymentSuccess(false);
+          // Clear URL and reload data
+          window.history.pushState({}, '', '/');
+          loadDatabaseUsage();
+        }}
+      />
     );
   }
 
@@ -443,13 +497,53 @@ function App() {
                 <h1 className="text-2xl font-semibold text-zinc-100">Database Instances</h1>
                 <p className="text-sm text-zinc-500 mt-1">{databases.length} total instances • {runningDatabases} running • {totalStorage} MB storage</p>
               </div>
-              <button
-                onClick={() => setShowDatabaseSelector(true)}
-                className="px-4 py-2 rounded-lg bg-purple-500 hover:bg-purple-600 text-white text-sm font-medium flex items-center gap-2 transition"
-              >
-                <Plus className="w-4 h-4" />
-                New Database
-              </button>
+              <div className="flex items-center gap-3">
+                {/* Usage indicator */}
+                {databaseUsage && (
+                  <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-[#0f1014] border border-zinc-800/60">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-zinc-500">Usage:</span>
+                      <span className={`text-sm font-mono font-bold ${
+                        databaseUsage.percentUsed >= 90 ? 'text-red-400' : 
+                        databaseUsage.percentUsed >= 70 ? 'text-yellow-400' : 'text-emerald-400'
+                      }`}>
+                        {databaseUsage.currentCount}/{databaseUsage.limit}
+                      </span>
+                    </div>
+                    <div className="h-2 w-16 bg-zinc-800 rounded-full overflow-hidden">
+                      <div 
+                        className={`h-full transition-all ${
+                          databaseUsage.percentUsed >= 90 ? 'bg-red-500' : 
+                          databaseUsage.percentUsed >= 70 ? 'bg-yellow-500' : 'bg-emerald-500'
+                        }`}
+                        style={{ width: `${databaseUsage.percentUsed}%` }}
+                      />
+                    </div>
+                    {databaseUsage.tier !== 'FREE' && (
+                      <span className="text-xs px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-400 font-medium">
+                        {databaseUsage.tier}
+                      </span>
+                    )}
+                  </div>
+                )}
+                
+                {/* Upgrade button */}
+                <button
+                  onClick={() => setShowPricingModal(true)}
+                  className="px-3 py-2 rounded-lg bg-gradient-to-r from-purple-500/20 to-fuchsia-500/20 border border-purple-500/30 text-purple-400 text-sm font-medium flex items-center gap-2 hover:from-purple-500/30 hover:to-fuchsia-500/30 transition"
+                >
+                  <Crown className="w-4 h-4" />
+                  Upgrade
+                </button>
+
+                <button
+                  onClick={() => setShowDatabaseSelector(true)}
+                  className="px-4 py-2 rounded-lg bg-purple-500 hover:bg-purple-600 text-white text-sm font-medium flex items-center gap-2 transition"
+                >
+                  <Plus className="w-4 h-4" />
+                  New Database
+                </button>
+              </div>
             </div>
 
             {/* System Overview Cards */}
@@ -1223,6 +1317,31 @@ function App() {
           database={workbenchDatabase}
           isOpen={!!workbenchDatabase}
           onClose={() => setWorkbenchDatabase(null)}
+        />
+      )}
+
+      {/* Pricing Modal */}
+      <PricingModal
+        isOpen={showPricingModal}
+        onClose={() => setShowPricingModal(false)}
+        currentUsage={databaseUsage || undefined}
+      />
+
+      {/* Upgrade Prompt (shown when limit reached) */}
+      {upgradePromptData && (
+        <UpgradePrompt
+          isOpen={showUpgradePrompt}
+          onClose={() => {
+            setShowUpgradePrompt(false);
+            setUpgradePromptData(null);
+          }}
+          onUpgrade={() => {
+            setShowUpgradePrompt(false);
+            setShowPricingModal(true);
+          }}
+          currentCount={upgradePromptData.currentCount}
+          limit={upgradePromptData.limit}
+          tier={upgradePromptData.tier}
         />
       )}
     </div>

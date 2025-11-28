@@ -41,7 +41,7 @@ public class SecurityConfig {
             .csrf(csrf -> csrf.disable())
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/api/auth/**", "/api/health/**", "/api/public/**", "/api/database-types", "/api/databases/types", "/health").permitAll()
+                .requestMatchers("/api/auth/**", "/api/health/**", "/api/public/**", "/api/database-types", "/api/databases/types", "/api/webhook/**", "/api/payments/webhook", "/health").permitAll()
                 .anyRequest().authenticated()
             )
             .addFilterBefore(apiKeyFilter, UsernamePasswordAuthenticationFilter.class)
